@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Engine tests + backend compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Bogdanp/setup-racket@v1.15
+        with:
+          version: stable
+          distribution: full
+      - name: Install deps (Rivet from catalog, docs/ci.md standard)
+        run: raco pkg install --auto --no-docs crypto rivet
+      - name: Engine tests
+        run: raco test tests/
+      - name: Backend compiles against the RVT1 contract
+        run: raco make app/backend.rkt
+
+  macos:
+    name: macOS host build
+    needs: engine
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Bogdanp/setup-racket@v1.15
+        with:
+          version: stable
+          distribution: full
+      - run: raco pkg install --auto --no-docs rivet crypto
+      - run: raco rivet build
