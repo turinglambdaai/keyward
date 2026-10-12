@@ -6,6 +6,7 @@
          racket/file
          racket/list
          racket/path
+         racket/string
          "../app/core/store.rkt")
 
 (define (make-fixture! text)
