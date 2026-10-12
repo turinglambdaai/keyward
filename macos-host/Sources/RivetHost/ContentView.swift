@@ -77,28 +77,38 @@ struct ContentView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-        .confirmationDialog(
-            "Generate a new Ed25519 update key for \(model.selected?.name ?? "")?\n"
-                + "The new pair is collected into the store directly. Rotating the "
-                + "signing key is a release-level change — ship a build trusting the "
-                + "new public key first.",
-            isPresented: $confirmingKeyGen,
-            titleVisibility: .visible) {
+        .confirmationDialog(keyGenMessage, isPresented: $confirmingKeyGen,
+                            titleVisibility: .visible) {
             Button("Generate", role: .destructive) { model.generateUpdateKey() }
             Button("Cancel", role: .cancel) {}
         }
-        .confirmationDialog(
-            "Delete \(deleteTarget?.name ?? "")? A snapshot is taken first and the old "
-                + "value stays recoverable from it.",
-            isPresented: Binding(get: { deleteTarget != nil },
-                                 set: { if !$0 { deleteTarget = nil } }),
-            titleVisibility: .visible) {
+        .confirmationDialog(deleteMessage, isPresented: deleteBinding,
+                            titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 if let t = deleteTarget { model.deleteEntry(t) }
                 deleteTarget = nil
             }
             Button("Cancel", role: .cancel) { deleteTarget = nil }
         }
+    }
+
+    private var keyGenMessage: String {
+        let name = model.selected?.name ?? ""
+        return "Generate a new Ed25519 update key for \(name)? "
+            + "The new pair is collected into the store directly. Rotating the "
+            + "signing key is a release-level change — ship a build trusting the "
+            + "new public key first."
+    }
+
+    private var deleteMessage: String {
+        let name = deleteTarget?.name ?? ""
+        return "Delete \(name)? A snapshot is taken first and the old value "
+            + "stays recoverable from it."
+    }
+
+    private var deleteBinding: Binding<Bool> {
+        Binding(get: { deleteTarget != nil },
+                set: { if !$0 { deleteTarget = nil } })
     }
 
     // ---- sidebar ------------------------------------------------------------
