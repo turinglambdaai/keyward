@@ -103,16 +103,20 @@ struct ContentView: View {
 
     // ---- sidebar ------------------------------------------------------------
 
+    private var selectionBinding: Binding<String?> {
+        Binding(
+            get: { model.selected?.name },
+            set: { newName in
+                if let newName,
+                   let product = model.products.first(where: { $0.name == newName }) {
+                    model.select(product)
+                }
+            })
+    }
+
     private var sidebar: some View {
         VStack(spacing: 0) {
-            List(model.products, selection: Binding(
-                get: { model.selected?.name },
-                set: { newName in
-                    if let newName,
-                       let product = model.products.first(where: { $0.name == newName }) {
-                        model.select(product)
-                    }
-                })) { product in
+            List(model.products, selection: selectionBinding) { product in
                 productRow(product)
                     .tag(product.name)
             }
