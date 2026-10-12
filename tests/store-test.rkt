@@ -112,9 +112,10 @@ EOF
 
 (define snap-dir (snapshots-dir p))
 (check-true (directory-exists? snap-dir))
+;; four mutations happened above (CCCC, NEW_ENTRY, gamma, delete) — one
+;; snapshot each; the failed guard calls never reach the snapshot
 (define snaps-before (length (store-snapshots p)))
-;; every mutation above snapshotted first — several snapshots exist now
-(check-true (>= snaps-before 5))
+(check-true (>= snaps-before 4))
 (store-set-entry! p "beta" "NOTE" "changed")
 (check-true (= (length (store-snapshots p)) (add1 snaps-before)))
 
