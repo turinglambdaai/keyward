@@ -22,6 +22,14 @@ struct RivetHostApp: App {
             KeywardCommands(model: model)
             CommandGroup(replacing: .toolbar) {}
             CommandGroup(replacing: .sidebar) {}
+            CommandGroup(replacing: .help) {
+                Button("User Guide — 使用手册") {
+                    if let url = URL(string:
+                        "https://github.com/turinglambdaai/keyward/blob/main/docs/GUIDE.zh-CN.md") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
         }
     }
 }

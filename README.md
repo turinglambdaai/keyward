@@ -16,6 +16,11 @@ nobody hands you is custody for the private half: where it lives, how it
 reaches CI, when it rotates, and how you notice a stray copy before it
 rotates *you*.
 
+> 📖 **New to update signing?** Read the step-by-step guide —
+> **[使用手册（中文）](docs/GUIDE.zh-CN.md)**: install, connect a vault,
+> every daily operation, wiring CI, shipping updates, and key rotation,
+> written for complete beginners. (English translation on the roadmap.)
+
 Keyward is a small desktop app that guards those keys. Built on the family
 Rivet line — a Racket engine with native hosts — it keeps the vault file in
 your own synced folder and adds the discipline a plaintext store lacks:
