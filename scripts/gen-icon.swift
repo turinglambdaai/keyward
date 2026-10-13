@@ -30,7 +30,7 @@ let grad = CGGradient(colorsSpace: nil, colors: [
 ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: S), end: CGPoint(x: 0, y: 0), options: [])
 
 // vault dial: ring + hub
-let dial = CGPoint(x: 418, y: 462)
+let dial = CGPoint(x: 418, y: 512)
 let white = CGColor(red: 1, green: 1, blue: 1, alpha: 0.97)
 ctx.setStrokeColor(white)
 ctx.setLineWidth(60)
