@@ -215,6 +215,17 @@ struct ContentView: View {
                     }
                 }
             }
+        } else if model.storePath.isEmpty {
+            ContentUnavailableView {
+                Label("No vault selected", systemImage: "key.radiowaves.forward")
+            } description: {
+                Text("Point Keyward at your secrets.ini (any vault in the same\n"
+                       + "INI format works). The choice is remembered across launches\n"
+                       + "and the file never leaves your sync folder.")
+            } actions: {
+                Button("Choose Vault…") { showingOpenStore = true }
+                    .buttonStyle(.borderedProminent)
+            }
         } else {
             ContentUnavailableView(
                 "Keyward",

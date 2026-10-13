@@ -21,38 +21,50 @@
          racket/path
          racket/string
          rivet/backend
+         "core/config.rkt"
          "core/keymeta.rkt"
          "core/store.rkt")
 
 (provide start)
 
+;; the active vault: a path string, or #f until the user picks one
 (define current-store
   (make-parameter (store-path-default)))
+
+(define (active-store)
+  (or (current-store)
+      (error 'keyward "no vault selected — choose a secrets.ini first")))
 
 ;; ---- store -----------------------------------------------------------------
 
 (define-rpc (store-path : String)
-  (path->string (current-store)))
+  (define p (current-store))
+  (if p (path->string p) ""))
 
 (define-rpc (store-open [path String] : String)
   (define p (simple-form-path (string-trim path)))
   (unless (file-exists? p) (error 'store-open "no such store: ~a" p))
   (current-store p)
+  ;; remember the choice across launches — the config holds a path, never a
+  ;; secret; the family path is only a fallback, never an assumption
+  (config-set! "store" (path->string p))
   (path->string p))
 
 ;; light listing: emptiness only, no crypto — cheap enough for the sidebar
 (define-rpc (store-info : (List (List String)))
-  (define path (current-store))
-  (for/list ([section (in-list (store-sections path))])
-    (define entries (store-section-entries path section))
-    (define empties (length (filter (lambda (e) (string=? (cdr e) "")) entries)))
-    (list section
-          (~a (length entries))
-          (or (store-entry-ref path section "RIVET_UPDATE_KEY_ID") "")
-          (entry-fingerprint path section)
-          (cond [(zero? (length entries)) "empty-section"]
-                [(positive? empties) (format "empty:~a" empties)]
-                [else "ok"]))))
+  (if (current-store)
+      (let ([path (current-store)])
+        (for/list ([section (in-list (store-sections path))])
+          (define entries (store-section-entries path section))
+          (define empties (length (filter (lambda (e) (string=? (cdr e) "")) entries)))
+          (list section
+                (~a (length entries))
+                (or (store-entry-ref path section "RIVET_UPDATE_KEY_ID") "")
+                (entry-fingerprint path section)
+                (cond [(zero? (length entries)) "empty-section"]
+                      [(positive? empties) (format "empty:~a" empties)]
+                      [else "ok"]))))
+      '()))
 
 (define (entry-fingerprint path section)
   (with-handlers ([exn:fail? (lambda (_) "-")])
@@ -62,26 +74,28 @@
 
 ;; deep check: parses every key, verifies pairs, counts orphans
 (define-rpc (check-store : (List (List String)))
-  (define path (current-store))
-  (append
-   (for/list ([row (in-list (store-check path key-summary))])
-     (list (car row)
-           (row-ref row 'entries)
-           (row-ref row 'empty)
-           (row-ref row 'key-id)
-           (row-ref row 'kind)
-           (row-ref row 'fingerprint)
-           (row-ref row 'paired)
-           (row-ref row 'status)))
-   (list
-    (list "(file)"
-          ""
-          (format "~a orphans" (length (store-orphan-lines path)))
-          ""
-          ""
-          ""
-          ""
-          (store-file-status path)))))
+  (if (current-store)
+      (let ([path (current-store)])
+        (append
+         (for/list ([row (in-list (store-check path key-summary))])
+           (list (car row)
+                 (row-ref row 'entries)
+                 (row-ref row 'empty)
+                 (row-ref row 'key-id)
+                 (row-ref row 'kind)
+                 (row-ref row 'fingerprint)
+                 (row-ref row 'paired)
+                 (row-ref row 'status)))
+         (list
+          (list "(file)"
+                ""
+                (format "~a orphans" (length (store-orphan-lines path)))
+                ""
+                ""
+                ""
+                ""
+                (store-file-status path)))))
+      '()))
 
 (define (row-ref row key)
   (define hit (assoc key (cdr row)))
@@ -98,20 +112,20 @@
 ;; ---- entries -----------------------------------------------------------------
 
 (define-rpc (entry-list [product String] : (List (List String)))
-  (for/list ([e (in-list (store-section-entries (current-store) product))])
+  (for/list ([e (in-list (store-section-entries (active-store) product))])
     (list (car e) (if (string=? (cdr e) "") "empty" "set"))))
 
 ;; explicit demand only — hosts wire this to copy-to-clipboard
 (define-rpc (entry-get [product String] [name String] : String)
-  (or (store-entry-ref (current-store) product name)
+  (or (store-entry-ref (active-store) product name)
       (error 'entry-get "no such entry: ~a/~a" product name)))
 
 (define-rpc (entry-set [product String] [name String] [value String] : String)
-  (store-set-entry! (current-store) product name value "set via keyward")
-  (fingerprint-if-key (current-store) product name))
+  (store-set-entry! (active-store) product name value "set via keyward")
+  (fingerprint-if-key (active-store) product name))
 
 (define-rpc (entry-delete [product String] [name String] : Bool)
-  (store-delete-entry! (current-store) product name "delete via keyward"))
+  (store-delete-entry! (active-store) product name "delete via keyward"))
 
 ;; collect a PEM file into the store as a single-line base64(PEM) value —
 ;; 散件即到即收: the import path never leaves a stray copy behind
@@ -122,8 +136,8 @@
   (define der (value->der text))
   (unless der (error 'entry-import-file "unreadable PEM: ~a" file-path))
   (define value (bytes->string/utf-8 (base64-encode der "")))
-  (store-set-entry! (current-store) product name value "import via keyward")
-  (fingerprint-if-key (current-store) product name))
+  (store-set-entry! (active-store) product name value "import via keyward")
+  (fingerprint-if-key (active-store) product name))
 
 (define (fingerprint-if-key path product name)
   (define summary (key-summary (store-section-entries path product)))
@@ -139,23 +153,23 @@
   (define-values (priv-der spki) (generate-keypair!))
   (define raw32 (subbytes spki (- (bytes-length spki) 32)))
   (define (b64 b) (bytes->string/utf-8 (base64-encode b "")))
-  (define key-id (or (store-entry-ref (current-store) product "RIVET_UPDATE_KEY_ID")
+  (define key-id (or (store-entry-ref (active-store) product "RIVET_UPDATE_KEY_ID")
                      (make-key-id product)))
   (define reason (format "generate update key ~a" key-id))
-  (store-set-entry! (current-store) product "UPDATE_ED25519_PRIVATE_KEY_B64" (b64 priv-der) reason)
-  (store-set-entry! (current-store) product "UPDATE_ED25519_PUBLIC_KEY_SPKI_B64" (b64 spki) reason)
-  (store-set-entry! (current-store) product "UPDATE_ED25519_PUBLIC_KEY_RAW_TAIL32_B64" (b64 raw32) reason)
-  (store-set-entry! (current-store) product "RIVET_UPDATE_KEY_ID" key-id reason)
+  (store-set-entry! (active-store) product "UPDATE_ED25519_PRIVATE_KEY_B64" (b64 priv-der) reason)
+  (store-set-entry! (active-store) product "UPDATE_ED25519_PUBLIC_KEY_SPKI_B64" (b64 spki) reason)
+  (store-set-entry! (active-store) product "UPDATE_ED25519_PUBLIC_KEY_RAW_TAIL32_B64" (b64 raw32) reason)
+  (store-set-entry! (active-store) product "RIVET_UPDATE_KEY_ID" key-id reason)
   (list key-id (fingerprint-of-der spki) (b64 spki) (b64 raw32)))
 
 ;; ---- snapshots ----------------------------------------------------------------
 
 (define-rpc (snapshot-list : (List (List String)))
-  (for/list ([s (in-list (store-snapshots (current-store)))])
+  (for/list ([s (in-list (store-snapshots (active-store)))])
     (list (car s) (cdr s))))
 
 (define-rpc (snapshot-restore [stamp String] : Bool)
-  (store-restore-snapshot! (current-store) stamp))
+  (store-restore-snapshot! (active-store) stamp))
 
 ;; ---- lifecycle ----------------------------------------------------------------
 

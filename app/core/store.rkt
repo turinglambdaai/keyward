@@ -21,7 +21,8 @@
          racket/list
          racket/match
          racket/path
-         racket/string)
+         racket/string
+         "config.rkt")
 
 (provide store-path-default
          store-sections
@@ -51,11 +52,17 @@
   (define d (current-date))
   (format "~a-~a-~a" product (date-year d) (~r (date-month d) #:min-width 2 #:pad-string "0")))
 
+;; Resolution order for the initial vault: the user's persisted choice
+;; (~/.keyward/config.json) → the KEYWARD_STORE environment variable → the
+;; family path when it actually exists → #f, meaning "nothing selected yet"
+;; and the host should ask. ~/Sync/Keys is our own layout, never an
+;; assumption about other users.
 (define (store-path-default)
-  (define env (getenv "KEYWARD_STORE"))
-  (if env
-      (simple-form-path env)
-      (expand-user-path "~/Sync/Keys/secrets.ini")))
+  (define home-default (expand-user-path "~/Sync/Keys/secrets.ini"))
+  (or (config-get "store")
+      (let ([env (getenv "KEYWARD_STORE")])
+        (and env (not (string=? env "")) env))
+      (and (file-exists? home-default) (path->string home-default))))
 
 ;; ---- line classification ------------------------------------------------------
 ;;   'blank / 'comment / ('section title) / ('entry name value) / 'orphan

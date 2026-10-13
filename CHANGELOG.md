@@ -34,3 +34,10 @@ All notable changes to Keyward are documented here. Format follows
   the only path to a key's value (never displayed in the UI).
 - macOS SwiftUI host (M0); Windows WinUI3 and Linux GTK4 hosts queued
   for M1.
+
+## Unreleased — changed
+
+- The vault location is user-chosen and remembered across launches
+  (`~/.keyward/config.json` stores the path — nothing else). The
+  `~/Sync/Keys/secrets.ini` family layout remains the zero-config default
+  when it exists; `KEYWARD_STORE` still overrides for CI.
