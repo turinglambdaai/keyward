@@ -34,14 +34,15 @@
         (if (hash? v) v (hasheq)))
       (hasheq)))
 
-;; string values only; #f when unset
+;; string values only; #f when unset. JSON keys are symbols on the wire —
+;; older Racket's write-json rejects string keys.
 (define (config-get key)
-  (define v (hash-ref (config-load) key #f))
+  (define v (hash-ref (config-load) (string->symbol key) #f))
   (and (string? v) (not (string=? v "")) v))
 
 (define (config-set! key value)
   (make-directory* (config-dir))
-  (define h (hash-set (config-load) key value))
+  (define h (hash-set (config-load) (string->symbol key) value))
   (define tmp (make-temporary-file "keyward-cfg~a.json" #f (config-dir)))
   (with-output-to-file tmp
     (lambda () (write-json h) (newline))
