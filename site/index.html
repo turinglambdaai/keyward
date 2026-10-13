@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keyward — 自更新应用的签名钥保险库</title>
+<meta name="description" content="Keyward: 私钥签更新清单、公钥嵌在已装应用里验签——Sparkle、Tauri、electron-updater 全是这一套，缺的是私钥的日常托管。值永不显示只进剪贴板，每次改动先快照，深度校验，生成即入库。Rivet 线——Racket 引擎驱动原生壳。">
+<link rel="stylesheet" href="styles.css">
+<script>
+  (function () {
+    var t = localStorage.getItem('keyward-theme');
+    if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+    var l = localStorage.getItem('keyward-lang');
+    if (!l) l = (navigator.language || 'zh').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+    document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
+  })();
+</script>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">Keyward</a>
+    <nav class="nav-links">
+      <a href="#why" data-i18n="nav.why">为什么需要</a>
+      <a href="#principles" data-i18n="nav.principles">设计原则</a>
+      <a href="#start" data-i18n="nav.start">三步开始</a>
+      <a href="#download" data-i18n="nav.download">下载</a>
+      <a href="https://github.com/turinglambdaai/keyward" data-i18n="nav.github">GitHub</a>
+      <div class="lang-dropdown-wrapper">
+        <button class="lang-btn" type="button" aria-label="Switch language">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          <span id="current-lang-label">English</span>
+        </button>
+        <ul class="lang-menu">
+          <li onclick="setLanguage('en')">English</li>
+          <li onclick="setLanguage('zh')">简体中文</li>
+        </ul>
+      </div>
+      <button class="theme-btn" id="theme-btn" aria-label="Toggle theme">◐</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="kicker" data-i18n="kicker">本地保险库 · 值不显示 · 零网络</p>
+    <h1 data-i18n="hero-title">给你的更新签名钥，一个像样的家。</h1>
+    <p class="lede" data-i18n="hero-lede">
+      桌面应用的在线更新全靠同一套信任模型：私钥签更新清单，公钥嵌在
+      已装应用里验签——Sparkle、Tauri、electron-updater、WinSparkle 都
+      是它。可私钥的日常托管没人替你管：一次泄漏、一份散件、一次误删，
+      断的就是整条更新线。Keyward 把这件事变成点按钮。
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#download" data-i18n="hero.download">获取 Keyward</a>
+      <a class="btn btn-secondary" href="https://github.com/turinglambdaai/keyward" data-i18n="hero.source">查看源码</a>
+    </div>
+  </section>
+
+  <section id="why" class="section">
+    <h2 data-i18n="why-title">为什么需要</h2>
+    <div class="grid three">
+      <div class="card">
+        <div class="card-icon">🔓</div>
+        <h3 data-i18n="w1-title">泄漏比你想的近</h3>
+        <p data-i18n="w1-body">一条调试命令、一段贴进日志的 PEM 正文，私钥就进了会话记录——泄漏从来不是黑客剧本，是日常手滑。我们自家两周内就发生过两次。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🧨</div>
+        <h3 data-i18n="w2-title">散件是定时炸弹</h3>
+        <p data-i18n="w2-body">工作树里的 PEM、CI 里的旧副本、上一次轮换没删干净的本地文件——轮换那天永远有一个被忘记，旧钥继续有效就是后门。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🕯️</div>
+        <h3 data-i18n="w3-title">丢钥就是全线断更</h3>
+        <p data-i18n="w3-body">私钥只活在 CI secret 里时，一次误删、一次坏写入，所有已装用户再也收不到任何更新。备份不该是"记得复制一下"。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="principles" class="section alt">
+    <h2 data-i18n="principles-title">设计原则</h2>
+    <div class="grid two">
+      <div class="card">
+        <h3 data-i18n="p1-title">值永不显示</h3>
+        <p data-i18n="p1-body">私钥只有一条路离开引擎：复制到剪贴板。列表和体检结果只出现名字、计数与指纹——日志里打错一个结构体都是事故。</p>
+      </div>
+      <div class="card">
+        <h3 data-i18n="p2-title">每次写入先快照</h3>
+        <p data-i18n="p2-body">任何改动先把整库快照进同步盘的 .history——快照跟着库一起同步，坏写入一次恢复，每个设备上都有底。</p>
+      </div>
+      <div class="card">
+        <h3 data-i18n="p3-title">明文同步，预算给全盘加密</h3>
+        <p data-i18n="p3-body">库就是你同步盘里的明文 INI，信任设备间直连；引擎零网络代码，密钥不出本机。防失窃交给 FileVault / BitLocker。</p>
+      </div>
+      <div class="card">
+        <h3 data-i18n="p4-title">生成即入库</h3>
+        <p data-i18n="p4-body">应用内生成钥匙直接写进库——连瞬时散件都不存在。值强制单行，坏粘贴以行号暴露；格式兼容你现有的库，零迁移。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="start" class="section">
+    <h2 data-i18n="start-title">三步开始</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <h3 data-i18n="s1-title">指向你的库</h3>
+          <p data-i18n="s1-body">默认打开 ~/Sync/Keys/secrets.ini，也兼容任何同格式的 INI——不新建格式、不强迫迁移，你的同步盘继续是唯一事实源。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <h3 data-i18n="s2-title">Deep Check 一键体检</h3>
+          <p data-i18n="s2-body">解析每把私钥、派生公钥、算指纹、和库内公钥配对——过去一下午的手工 openssl，现在一屏读完。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <h3 data-i18n="s3-title">改即有底</h3>
+          <p data-i18n="s3-body">生成、导入、修改、删除，每一步都先落快照；要回滚，恢复就是一次点击。值想用时复制进剪贴板，永不回显。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="download" class="section alt">
+    <h2 data-i18n="download-title">下载</h2>
+    <div class="dl-grid">
+      <a class="dl-card" href="https://github.com/turinglambdaai/keyward/releases">
+        <h3>macOS（Apple Silicon）</h3>
+        <p data-i18n="dl-mac-arm">DMG 安装器。首个版本随 1.0.0 发布，敬请期待。</p>
+        <span class="btn btn-primary" data-i18n="dl-watch">关注发布 →</span>
+      </a>
+      <a class="dl-card" href="https://github.com/turinglambdaai/keyward/releases">
+        <h3>Windows（x64）/ Linux</h3>
+        <p data-i18n="dl-win-lin">WinUI 3 与 GTK4 原生壳随 M1 里程碑交付，首发即全矩阵。</p>
+        <span class="btn btn-primary" data-i18n="dl-watch">关注发布 →</span>
+      </a>
+      <div class="dl-card">
+        <h3 data-i18n="dl-platforms-title">平台</h3>
+        <p class="platform-row">
+          <span class="chip ok">macOS</span>
+          <span class="chip">Windows</span>
+          <span class="chip">Linux</span>
+        </p>
+        <p class="muted" data-i18n="dl-platforms-body">
+          M0：macOS 壳可从源码构建；三平台安装包随首个发布交付。这是开发者工具，不做移动端。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 data-i18n="roadmap-title">路线图</h2>
+    <ul>
+      <li><strong>M1</strong> — <span data-i18n="rm1">Windows / Linux 原生壳 + 首个发布（三平台安装包）</span></li>
+      <li><strong>M2</strong> — <span data-i18n="rm2">轮换工作流：generate-next → promote 两阶段，照 family runbook 走</span></li>
+      <li><strong>M3</strong> — <span data-i18n="rm3">散件扫描：扫工作树找未收编的 PEM/DER，泄漏面主动暴露</span></li>
+      <li><strong>M4</strong> — <span data-i18n="rm4">生态兼容：Sparkle / Tauri updater / electron-updater 钥格式导入导出</span></li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <span>AGPL-3.0 · <a href="https://github.com/turinglambdaai/keyward">github.com/turinglambdaai/keyward</a></span>
+  <span data-i18n="footer-note">引擎零网络代码；库文件永远在你自己的同步盘里。明文同步是信任设备间的设计决策，防失窃交给各机全盘加密。</span>
+</footer>
+
+<script>
+(function () {
+  var I18N = {
+    en: {
+      'nav.why': 'Why', 'nav.principles': 'Principles', 'nav.start': 'Get started',
+      'nav.download': 'Download', 'nav.github': 'GitHub',
+      'kicker': 'local vault · copy-only values · zero network',
+      'hero-title': 'Give your update-signing keys a proper home.',
+      'hero-lede': "Desktop apps that update themselves all share one trust model: a private key signs the update manifest, a public key embedded in the installed app verifies it — Sparkle, Tauri, electron-updater, WinSparkle. What nobody hands you is custody of the private half. One leak, one stray copy, one accidental delete, and your whole update line goes down. Keyward turns that into buttons.",
+      'hero.download': 'Get Keyward', 'hero.source': 'View source',
+      'why-title': 'Why Keyward',
+      'w1-title': 'Leaks are closer than you think',
+      'w1-body': "One debug command, one PEM body pasted into a log, and the private key is in a session transcript. Leaks are not hacker movie plots — they are everyday slips. It happened to us twice in two weeks.",
+      'w2-title': 'Stray copies are time bombs',
+      'w2-body': "A PEM in the working tree, an old CI copy, a local file the last rotation forgot — on rotation day exactly one of them gets missed, and a still-valid old key is a backdoor.",
+      'w3-title': 'Losing the key ends the update line',
+      'w3-body': "While the private key lives only in a CI secret, one bad delete or one corrupt write means installed users never receive another update. Backup should not be \"remember to copy it\".",
+      'principles-title': 'Design principles',
+      'p1-title': 'Values are never displayed',
+      'p1-body': 'A private key has exactly one way out of the engine: the clipboard. Listings and check results carry names, counts and fingerprints only — one wrong struct in a log line is an incident.',
+      'p2-title': 'Every write snapshots first',
+      'p2-body': 'Any change snapshots the whole store into the sync folder first — snapshots travel with the vault, a bad write is one restore away, and every device has a copy.',
+      'p3-title': 'Plaintext sync, budget to disk encryption',
+      'p3-body': 'The vault is a plaintext INI in your own sync folder between trusted devices; the engine has zero network code. Theft is FileVault / BitLocker territory.',
+      'p4-title': 'Generation lands in the vault',
+      'p4-body': 'Keys generated in-app are written straight into the store — not even a momentary stray file. Values are hard-single-line, bad pastes surface as line numbers; the format is your existing one, zero migration.',
+      'start-title': 'Get started in three steps',
+      's1-title': 'Point it at your vault',
+      's1-body': 'Keyward opens ~/Sync/Keys/secrets.ini by default and any INI in the same format — no new format, no forced migration; your sync folder stays the single source of truth.',
+      's2-title': 'One-click Deep Check',
+      's2-body': 'Parses every private key, derives the public half, computes fingerprints and pairs them against stored public material — an afternoon of hand-run openssl, read at a glance.',
+      's3-title': 'Every change leaves a floor',
+      's3-body': 'Generate, import, edit, delete — each step snapshots first; restoring is one click. Values leave only through copy-to-clipboard, never a display.',
+      'download-title': 'Download',
+      'dl-mac-arm': 'DMG installer. The first release ships with 1.0.0 — stay tuned.',
+      'dl-win-lin': 'WinUI 3 and GTK4 native hosts land with milestone M1; the first release covers the full matrix.',
+      'dl-watch': 'Watch releases →',
+      'dl-platforms-title': 'Platforms',
+      'dl-platforms-body': 'M0: the macOS shell builds from source; installers for all three desktops ship with the first release. A developer tool — no mobile.',
+      'roadmap-title': 'Roadmap',
+      'rm1': 'Windows / Linux native hosts + the first release (three-platform installers)',
+      'rm2': 'Rotation workflow: generate-next → promote, following the family runbook',
+      'rm3': 'Stray scan: sweep working trees for uncollected PEM/DER and surface the leak area',
+      'rm4': 'Ecosystem formats: Sparkle / Tauri updater / electron-updater key import & export',
+      'footer-note': 'Zero network code in the engine; the vault always stays in your own sync folder. Plaintext sync between trusted devices is a design decision — theft is what full-disk encryption is for.'
+    },
+    zh: {
+      'nav.why': '为什么需要', 'nav.principles': '设计原则', 'nav.start': '三步开始',
+      'nav.download': '下载', 'nav.github': 'GitHub',
+      'kicker': '本地保险库 · 值不显示 · 零网络',
+      'hero-title': '给你的更新签名钥，一个像样的家。',
+      'hero-lede': '桌面应用的在线更新全靠同一套信任模型：私钥签更新清单，公钥嵌在已装应用里验签——Sparkle、Tauri、electron-updater、WinSparkle 都是它。可私钥的日常托管没人替你管：一次泄漏、一份散件、一次误删，断的就是整条更新线。Keyward 把这件事变成点按钮。',
+      'hero.download': '获取 Keyward', 'hero.source': '查看源码',
+      'why-title': '为什么需要',
+      'w1-title': '泄漏比你想的近',
+      'w1-body': '一条调试命令、一段贴进日志的 PEM 正文，私钥就进了会话记录——泄漏从来不是黑客剧本，是日常手滑。我们自家两周内就发生过两次。',
+      'w2-title': '散件是定时炸弹',
+      'w2-body': '工作树里的 PEM、CI 里的旧副本、上一次轮换没删干净的本地文件——轮换那天永远有一个被忘记，旧钥继续有效就是后门。',
+      'w3-title': '丢钥就是全线断更',
+      'w3-body': '私钥只活在 CI secret 里时，一次误删、一次坏写入，所有已装用户再也收不到任何更新。备份不该是"记得复制一下"。',
+      'principles-title': '设计原则',
+      'p1-title': '值永不显示',
+      'p1-body': '私钥只有一条路离开引擎：复制到剪贴板。列表和体检结果只出现名字、计数与指纹——日志里打错一个结构体都是事故。',
+      'p2-title': '每次写入先快照',
+      'p2-body': '任何改动先把整库快照进同步盘的 .history——快照跟着库一起同步，坏写入一次恢复，每个设备上都有底。',
+      'p3-title': '明文同步，预算给全盘加密',
+      'p3-body': '库就是你同步盘里的明文 INI，信任设备间直连；引擎零网络代码，密钥不出本机。防失窃交给 FileVault / BitLocker。',
+      'p4-title': '生成即入库',
+      'p4-body': '应用内生成钥匙直接写进库——连瞬时散件都不存在。值强制单行，坏粘贴以行号暴露；格式兼容你现有的库，零迁移。',
+      'start-title': '三步开始',
+      's1-title': '指向你的库',
+      's1-body': '默认打开 ~/Sync/Keys/secrets.ini，也兼容任何同格式的 INI——不新建格式、不强迫迁移，你的同步盘继续是唯一事实源。',
+      's2-title': 'Deep Check 一键体检',
+      's2-body': '解析每把私钥、派生公钥、算指纹、和库内公钥配对——过去一下午的手工 openssl，现在一屏读完。',
+      's3-title': '改即有底',
+      's3-body': '生成、导入、修改、删除，每一步都先落快照；要回滚，恢复就是一次点击。值想用时复制进剪贴板，永不回显。',
+      'download-title': '下载',
+      'dl-mac-arm': 'DMG 安装器。首个版本随 1.0.0 发布，敬请期待。',
+      'dl-win-lin': 'WinUI 3 与 GTK4 原生壳随 M1 里程碑交付，首发即全矩阵。',
+      'dl-watch': '关注发布 →',
+      'dl-platforms-title': '平台',
+      'dl-platforms-body': 'M0：macOS 壳可从源码构建；三平台安装包随首个发布交付。这是开发者工具，不做移动端。',
+      'roadmap-title': '路线图',
+      'rm1': 'Windows / Linux 原生壳 + 首个发布（三平台安装包）',
+      'rm2': '轮换工作流：generate-next → promote 两阶段，照 family runbook 走',
+      'rm3': '散件扫描：扫工作树找未收编的 PEM/DER，泄漏面主动暴露',
+      'rm4': '生态兼容：Sparkle / Tauri updater / electron-updater 钥格式导入导出',
+      'footer-note': '引擎零网络代码；库文件永远在你自己的同步盘里。明文同步是信任设备间的设计决策，防失窃交给各机全盘加密。'
+    }
+  };
+
+  function setLang(lang) {
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    var dict = I18N[lang];
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var key = el.getAttribute('data-i18n');
+      if (dict[key]) el.textContent = dict[key];
+    });
+    document.getElementById('current-lang-label').textContent = lang === 'zh' ? '简体中文' : 'English';
+    localStorage.setItem('keyward-lang', lang);
+  }
+
+  window.setLanguage = setLang;
+
+  document.querySelector('.lang-btn').addEventListener('click', function () {
+    var menu = document.querySelector('.lang-menu');
+    menu.classList.toggle('open');
+  });
+
+  document.getElementById('theme-btn').addEventListener('click', function () {
+    var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('keyward-theme', next);
+  });
+
+  setLang(document.documentElement.lang === 'zh-CN' ? 'zh' : 'en');
+})();
+</script>
+</body>
+</html>
