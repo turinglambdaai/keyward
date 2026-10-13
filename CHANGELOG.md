@@ -41,3 +41,18 @@ All notable changes to Keyward are documented here. Format follows
   (`~/.keyward/config.json` stores the path — nothing else). The
   `~/Sync/Keys/secrets.ini` family layout remains the zero-config default
   when it exists; `KEYWARD_STORE` still overrides for CI.
+
+## Unreleased — changed
+
+- **macOS host redesigned to the taskly-grade design language**: custom
+  window chrome (280px sidebar + content pane + 28px status bar), semantic
+  design tokens in warm vault tones with live light/dark tracking, summary
+  tiles, quiet selection/hover fills, hover-revealed copy buttons, and
+  keyboard shortcuts (⌘O choose vault · ⌘R deep check · ⌘L snapshots).
+- Brand app icon — the vault dial + key on the family warm gradient —
+  wired via `macos-icon`; the generator script lives at
+  `scripts/gen-icon.swift`.
+- The vault location is user-chosen and remembered across launches
+  (`~/.keyward/config.json` stores the path — nothing else). The
+  `~/Sync/Keys/secrets.ini` family layout remains the zero-config default
+  when it exists; `KEYWARD_STORE` still overrides for CI.

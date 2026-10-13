@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import RivetEmbedding
 import RivetRuntime
@@ -10,11 +11,39 @@ struct RivetHostApp: App {
     @StateObject private var model = KeywardModel()
 
     var body: some Scene {
-        WindowGroup(RivetGeneratedConfig.displayName) {
+        WindowGroup("Keyward") {
             ContentView()
                 .environmentObject(model)
-                .frame(minWidth: 780, minHeight: 480)
+                .frame(minWidth: 860, minHeight: 560)
                 .task { model.start() }
+        }
+        .defaultSize(width: 1180, height: 760)
+        .commands {
+            KeywardCommands(model: model)
+            CommandGroup(replacing: .toolbar) {}
+            CommandGroup(replacing: .sidebar) {}
+        }
+    }
+}
+
+struct KeywardCommands: Commands {
+    @ObservedObject var model: KeywardModel
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("Choose Vault…") { model.requestOpenStore() }
+                .keyboardShortcut("o", modifiers: [.command])
+        }
+        CommandMenu("Vault") {
+            Button("Deep Check") { model.checkAll() }
+                .keyboardShortcut("r", modifiers: [.command])
+                .disabled(!model.ready || model.storePath.isEmpty)
+            Button("Snapshots") {
+                model.loadSnapshots()
+                model.snapshotsVisible = true
+            }
+            .keyboardShortcut("l", modifiers: [.command])
+            .disabled(!model.ready || model.storePath.isEmpty)
         }
     }
 }
@@ -81,12 +110,39 @@ final class KeywardModel: ObservableObject {
     @Published var checks: [CheckRow] = []
     @Published var snapshots: [SnapshotRow] = []
     @Published var selected: ProductInfo?
-    @Published var message: String?
+    @Published var statusMessage: String?
+    @Published var errorMessage: String?
+    @Published var snapshotsVisible = false
+    @Published var openStoreRequested = false
+    @Published var isDark = false
+
+    var theme: ThemeState { ThemeState(isDark: isDark) }
+
+    var productCount: Int { products.count }
+    var okCount: Int { products.filter { $0.status == "ok" }.count }
+    var attentionCount: Int {
+        products.filter { $0.status != "ok" && $0.status != "no-key" && $0.status != "empty-section" }.count
+    }
 
     private var backend: EmbeddedRacketBackend?
 
+    init() {
+        // The model lives for the whole app session, so the observer needs
+        // no explicit teardown (Swift 6 forbids touching it from deinit).
+        DistributedNotificationCenter.default.addObserver(
+            forName: .init("AppleInterfaceThemeChanged"), object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.syncAppearance() }
+        }
+    }
+
+    func syncAppearance() {
+        isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    }
+
     func start() {
         guard backend == nil else { return }
+        syncAppearance()
 
         do {
             let config = try EmbeddedRacketConfiguration.resolvedDefault(
@@ -139,11 +195,11 @@ final class KeywardModel: ObservableObject {
                 let result = try await body(api)
                 await MainActor.run {
                     post(result)
-                    self.message = nil
+                    self.errorMessage = nil
                 }
             } catch {
                 await MainActor.run {
-                    self.message = "\(what): \(error)"
+                    self.errorMessage = "\(what): \(error)"
                 }
             }
         }
@@ -173,7 +229,7 @@ final class KeywardModel: ObservableObject {
                                 status: r.count > 7 ? r[7] : "")
             }
             self.refreshProducts()
-            self.message = "Deep check finished — \(rows.count) sections"
+            self.statusMessage = "Deep check finished — \(rows.count) sections"
         }
     }
 
@@ -189,14 +245,14 @@ final class KeywardModel: ObservableObject {
         call("entry-get") { try await $0.entry_get(product: product.name, name: entry.name) } then: { value in
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(value, forType: .string)
-            self.message = "Copied \(entry.name) to clipboard (never displayed)"
+            self.statusMessage = "Copied \(entry.name) — value stays off-screen"
         }
     }
 
     func setEntry(name: String, value: String) {
         guard let product = selected else { return }
         call("entry-set") { try await $0.entry_set(product: product.name, name: name, value: value) } then: { result in
-            self.message = "Set \(name) — \(result)"
+            self.statusMessage = "Set \(name) — \(result)"
             self.select(product)
         }
     }
@@ -204,7 +260,7 @@ final class KeywardModel: ObservableObject {
     func deleteEntry(_ entry: EntryRow) {
         guard let product = selected else { return }
         call("entry-delete") { try await $0.entry_delete(product: product.name, name: entry.name) } then: { _ in
-            self.message = "Deleted \(entry.name) (snapshot taken)"
+            self.statusMessage = "Deleted \(entry.name) (snapshot taken)"
             self.select(product)
         }
     }
@@ -215,7 +271,7 @@ final class KeywardModel: ObservableObject {
         call("entry-import-file") {
             try await $0.entry_import_file(product: product.name, name: name, file_path: path)
         } then: { result in
-            self.message = "Imported \(name) — \(result)"
+            self.statusMessage = "Imported \(name) — \(result)"
             self.select(product)
         }
     }
@@ -223,7 +279,7 @@ final class KeywardModel: ObservableObject {
     func generateUpdateKey() {
         guard let product = selected else { return }
         call("keypair-generate") { try await $0.keypair_generate(product: product.name) } then: { row in
-            self.message = "Generated \(row[0]) — fingerprint \(row[1]) (collected into store, no stray files)"
+            self.statusMessage = "Generated \(row[0]) — fingerprint \(row[1]) (collected into the vault)"
             self.select(product)
         }
     }
@@ -236,7 +292,7 @@ final class KeywardModel: ObservableObject {
 
     func restoreSnapshot(_ snap: SnapshotRow) {
         call("snapshot-restore") { try await $0.snapshot_restore(stamp: snap.stamp) } then: { _ in
-            self.message = "Restored \(snap.stamp) (pre-restore snapshot taken)"
+            self.statusMessage = "Restored \(snap.stamp) (pre-restore snapshot taken)"
             self.refreshProducts()
         }
     }
@@ -249,7 +305,12 @@ final class KeywardModel: ObservableObject {
             self.checks = []
             self.entries = []
             self.refreshProducts()
-            self.message = "Store switched: \(path)"
+            self.statusMessage = "Store switched: \(path)"
         }
+    }
+
+    /// The host raises this flag; the view presents the file importer.
+    func requestOpenStore() {
+        openStoreRequested = true
     }
 }
