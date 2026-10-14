@@ -5,9 +5,31 @@ All notable changes to Keyward are documented here. Format follows
 
 ## [Unreleased]
 
-Foundation round — feedback surfaces, no vault behaviour change.
+Windows and Linux hosts — the three-platform installer matrix closes;
+these entries land with the next release.
 
 ### Added
+
+- **Windows host** (WinUI 3 / C++/WinRT): product sidebar with status
+  dots and fingerprints, product detail with KV chips and entry cards,
+  copy-to-clipboard (values never display), PEM import through the file
+  picker, delete and key-generation confirmations, the snapshots dialog,
+  and the Choose Vault / Deep Check / Snapshots / About menu
+  (Ctrl+O / Ctrl+R / Ctrl+L).
+- **Linux host** (GTK4): the same surface — a GAction menu with the same
+  shortcuts, product list, entry rows with clipboard copy, the snapshots
+  dialog, and an About dialog carrying `Keyward v<version>`, the
+  AGPL-3.0 line and the project site.
+- **Windows release leg**: MSI (WiX 5) + portable zip, with per-file
+  SHA-256 sidecars; no update feed — a key vault does not update itself.
+- **Linux release leg**: x64 + arm64 matrix building tar.gz + deb + rpm +
+  AppImage + portable zip with a CycloneDX SBOM, plus stable direct-link
+  aliases (keyward-windows-x64.msi, keyward-linux-x64.deb/AppImage).
+- **Host CI**: `windows-host` (raco rivet build + launch smoke) and
+  `linux-host` (GTK4 build + headless boot smoke under xvfb) jobs, so a
+  release job is never the first place native source compiles.
+- Linux AppImage branding: the 512 px vault-dial icon (`linux-icon`) and
+  an explicit `linux-formats` selection in rivet.rktd.
 
 - **Help ▸ About**: an About sheet carrying the `Keyward v<version>`
   line (bundle version, falling back to the generated Rivet config), the

@@ -49,7 +49,8 @@ discipline layer over it, not a lock-in.
 
 M0 shipped: **v0.1.0 is out** — macOS installers (arm64 / x64, DMG + zip with
 SHA256SUMS) on the [Releases page](https://github.com/turinglambdaai/keyward/releases/latest).
-Windows (WinUI 3) and Linux (GTK4) hosts next. Roadmap: rotation workflow
+Windows (WinUI 3) and Linux (GTK4) hosts are built and CI-covered now; their
+installers land with the next release (v0.2.0). Roadmap: rotation workflow
 (generate-next → promote, following the two-phase runbook), stray-key scanner
 for working trees, Sparkle/Tauri key format import and export.
 
@@ -72,7 +73,7 @@ raco rivet package    # distributable
 - Shared engine: `app/backend.rkt` + `app/core/` (RVT1 contract — the
   wire surface shared by every future host)
 - macOS UI: `macos-host/Sources/RivetHost/`
-- Windows UI: `windows/` (M1) · Linux UI: `linux/` (M1)
+- Windows UI: `windows/` · Linux UI: `linux/`
 
 ## 中文简介
 
