@@ -26,7 +26,7 @@
       <a href="#principles" data-i18n="nav.principles">设计原则</a>
       <a href="#start" data-i18n="nav.start">三步开始</a>
       <a href="#download" data-i18n="nav.download">下载</a>
-      <a href="https://github.com/turinglambdaai/keyward/blob/main/docs/GUIDE.zh-CN.md" data-i18n="nav.guide">手册</a>
+      <a href="guide.html" data-i18n="nav.guide">手册</a>
       <a href="https://github.com/turinglambdaai/keyward" data-i18n="nav.github">GitHub</a>
       <div class="lang-dropdown-wrapper">
         <button class="lang-btn" type="button" aria-label="Switch language">
@@ -132,15 +132,15 @@
   <section id="download" class="section alt">
     <h2 data-i18n="download-title">下载</h2>
     <div class="dl-grid">
-      <a class="dl-card" href="https://github.com/turinglambdaai/keyward/releases">
-        <h3>macOS（Apple Silicon）</h3>
-        <p data-i18n="dl-mac-arm">DMG 安装器。首个版本随 1.0.0 发布，敬请期待。</p>
-        <span class="btn btn-primary" data-i18n="dl-watch">关注发布 →</span>
+      <a class="dl-card" href="https://github.com/turinglambdaai/keyward/releases/latest">
+        <h3 data-i18n="dl-mac-title">macOS（Apple Silicon / Intel）</h3>
+        <p data-i18n="dl-mac">DMG 安装器与便携 zip，arm64 / x64 双架构，随附逐件 SHA-256 与 SHA256SUMS 供校验。首个发布已上线。</p>
+        <span class="btn btn-primary" data-i18n="dl-mac-go">前往下载 →</span>
       </a>
-      <a class="dl-card" href="https://github.com/turinglambdaai/keyward/releases">
-        <h3>Windows（x64）/ Linux</h3>
-        <p data-i18n="dl-win-lin">WinUI 3 与 GTK4 原生壳随 M1 里程碑交付，首发即全矩阵。</p>
-        <span class="btn btn-primary" data-i18n="dl-watch">关注发布 →</span>
+      <a class="dl-card" href="https://github.com/turinglambdaai/keyward/actions/workflows/ci.yml">
+        <h3 data-i18n="dl-win-lin-title">Windows（x64）/ Linux</h3>
+        <p data-i18n="dl-win-lin">WinUI 3 与 GTK4 原生壳随 M1 里程碑交付；当前库文件本身是跨平台纯文本 INI，可先从源码构建。</p>
+        <span class="btn btn-secondary" data-i18n="dl-watch">关注发布 →</span>
       </a>
       <div class="dl-card">
         <h3 data-i18n="dl-platforms-title">平台</h3>
@@ -150,7 +150,7 @@
           <span class="chip">Linux</span>
         </p>
         <p class="muted" data-i18n="dl-platforms-body">
-          M0：macOS 壳可从源码构建；三平台安装包随首个发布交付。这是开发者工具，不做移动端。
+          首个发布已上线：macOS 安装包（arm64 + x64，DMG + zip + SHA256SUMS）。Windows / Linux 原生壳随 M1 交付。这是开发者工具，不做移动端。
         </p>
       </div>
     </div>
@@ -206,13 +206,16 @@
       's3-title': 'Every change leaves a floor',
       's3-body': 'Generate, import, edit, delete — each step snapshots first; restoring is one click. Values leave only through copy-to-clipboard, never a display.',
       'download-title': 'Download',
-      'dl-mac-arm': 'DMG installer. The first release ships with 1.0.0 — stay tuned.',
-      'dl-win-lin': 'WinUI 3 and GTK4 native hosts land with milestone M1; the first release covers the full matrix.',
+      'dl-mac-title': 'macOS (Apple Silicon / Intel)',
+      'dl-mac': 'DMG installers and portable zips for arm64 / x64, with per-file SHA-256 sidecars and a SHA256SUMS for verification. The first release is out.',
+      'dl-mac-go': 'Get it →',
+      'dl-win-lin-title': 'Windows (x64) / Linux',
+      'dl-win-lin': 'WinUI 3 and GTK4 native hosts land with milestone M1; the vault file itself is already cross-platform plaintext INI, and the hosts build from source.',
       'dl-watch': 'Watch releases →',
       'dl-platforms-title': 'Platforms',
-      'dl-platforms-body': 'M0: the macOS shell builds from source; installers for all three desktops ship with the first release. A developer tool — no mobile.',
+      'dl-platforms-body': 'The first release is out: macOS installers (arm64 + x64, DMG + zip + SHA256SUMS). Windows / Linux native hosts land with M1. A developer tool — no mobile.',
       'roadmap-title': 'Roadmap',
-      'rm1': 'Windows / Linux native hosts + the first release (three-platform installers)',
+      'rm1': 'Windows / Linux native hosts — completing the three-platform installer matrix',
       'rm2': 'Rotation workflow: generate-next → promote, following the family runbook',
       'rm3': 'Stray scan: sweep working trees for uncollected PEM/DER and surface the leak area',
       'rm4': 'Ecosystem formats: Sparkle / Tauri updater / electron-updater key import & export',
@@ -249,13 +252,16 @@
       's3-title': '改即有底',
       's3-body': '生成、导入、修改、删除，每一步都先落快照；要回滚，恢复就是一次点击。值想用时复制进剪贴板，永不回显。',
       'download-title': '下载',
-      'dl-mac-arm': 'DMG 安装器。首个版本随 1.0.0 发布，敬请期待。',
-      'dl-win-lin': 'WinUI 3 与 GTK4 原生壳随 M1 里程碑交付，首发即全矩阵。',
+      'dl-mac-title': 'macOS（Apple Silicon / Intel）',
+      'dl-mac': 'DMG 安装器与便携 zip，arm64 / x64 双架构，随附逐件 SHA-256 与 SHA256SUMS 供校验。首个发布已上线。',
+      'dl-mac-go': '前往下载 →',
+      'dl-win-lin-title': 'Windows（x64）/ Linux',
+      'dl-win-lin': 'WinUI 3 与 GTK4 原生壳随 M1 里程碑交付；当前库文件本身是跨平台纯文本 INI，可先从源码构建。',
       'dl-watch': '关注发布 →',
       'dl-platforms-title': '平台',
-      'dl-platforms-body': 'M0：macOS 壳可从源码构建；三平台安装包随首个发布交付。这是开发者工具，不做移动端。',
+      'dl-platforms-body': '首个发布已上线：macOS 安装包（arm64 + x64，DMG + zip + SHA256SUMS）。Windows / Linux 原生壳随 M1 交付。这是开发者工具，不做移动端。',
       'roadmap-title': '路线图',
-      'rm1': 'Windows / Linux 原生壳 + 首个发布（三平台安装包）',
+      'rm1': 'Windows / Linux 原生壳，补齐三平台安装包',
       'rm2': '轮换工作流：generate-next → promote 两阶段，照 family runbook 走',
       'rm3': '散件扫描：扫工作树找未收编的 PEM/DER，泄漏面主动暴露',
       'rm4': '生态兼容：Sparkle / Tauri updater / electron-updater 钥格式导入导出',

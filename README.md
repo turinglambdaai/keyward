@@ -16,10 +16,12 @@ nobody hands you is custody for the private half: where it lives, how it
 reaches CI, when it rotates, and how you notice a stray copy before it
 rotates *you*.
 
-> 📖 **New to update signing?** Read the step-by-step guide —
-> **[使用手册（中文）](docs/GUIDE.zh-CN.md)**: install, connect a vault,
+> 📖 **New to update signing?** Read the bilingual handbook —
+> **[使用手册 / Handbook](https://keyward.jrtx.site/guide.html)** (中文原文，
+> with an idiomatic English translation; switchable per language) —
+> or the [source markdown](docs/GUIDE.zh-CN.md): install, connect a vault,
 > every daily operation, wiring CI, shipping updates, and key rotation,
-> written for complete beginners. (English translation on the roadmap.)
+> written for complete beginners.
 
 Keyward is a small desktop app that guards those keys. Built on the family
 Rivet line — a Racket engine with native hosts — it keeps the vault file in
@@ -45,10 +47,11 @@ discipline layer over it, not a lock-in.
 
 ## Status
 
-M0, first release upcoming. macOS host shipping; Windows (WinUI 3) and
-Linux (GTK4) hosts next. Roadmap: rotation workflow (generate-next →
-promote, following the two-phase runbook), stray-key scanner for working
-trees, Sparkle/Tauri key format import and export.
+M0 shipped: **v0.1.0 is out** — macOS installers (arm64 / x64, DMG + zip with
+SHA256SUMS) on the [Releases page](https://github.com/turinglambdaai/keyward/releases/latest).
+Windows (WinUI 3) and Linux (GTK4) hosts next. Roadmap: rotation workflow
+(generate-next → promote, following the two-phase runbook), stray-key scanner
+for working trees, Sparkle/Tauri key format import and export.
 
 ## Security model
 

@@ -208,6 +208,38 @@ code {
 .prose li { margin: 6px 0; color: var(--muted); }
 .prose li strong { color: var(--ink); }
 
+/* ---- handbook (guide.html) ---- */
+main .section h3 { font-size: 18px; margin: 28px 0 10px; }
+main .section p { color: var(--muted); }
+main .section li { color: var(--muted); margin: 6px 0; }
+main .section strong { color: var(--ink); }
+main .section table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 18px;
+  font-size: 14.5px;
+}
+main .section th, main .section td {
+  text-align: left;
+  vertical-align: top;
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+}
+main .section th { background: var(--chip-bg); color: var(--ink); white-space: nowrap; }
+main .section td code { white-space: nowrap; }
+pre.code { margin: 10px 0 16px; }
+pre.code code { background: none; padding: 0; font-size: inherit; }
+.shot { margin: 14px 0 20px; }
+.shot img {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
+}
+.section p strong { color: var(--ink); }
+main .section ol { padding-left: 22px; }
+main .section ul { padding-left: 22px; }
+
 footer {
   max-width: 980px;
   margin: 32px auto 0;

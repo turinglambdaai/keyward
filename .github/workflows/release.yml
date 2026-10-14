@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Single source of truth for the rivet pin; every install step below
+# references this so a bump is one edit, not a grep-replace across jobs.
+env:
+  RIVET_PIN: v0.11.0
+
+jobs:
+  macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: arm64, runner: macos-latest, racket-arch: arm64 }
+          - { arch: x64, runner: macos-15-intel, racket-arch: x64 }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Racket CS
+        uses: Bogdanp/setup-racket@v1.15
+        with:
+          architecture: ${{ matrix.racket-arch }}
+          distribution: full
+          variant: CS
+          version: '9.3'
+      - name: Install Rivet (pinned, matches the local release drills)
+        run: raco pkg install --auto --no-docs crypto 'https://github.com/turinglambdaai/rivet.git#${{ env.RIVET_PIN }}'
+      - name: Version preflight (rivet.rktd == tag == CHANGELOG)
+        run: bash scripts/check-release-version.sh "${{ github.ref_name }}"
+      # DMG (human installer) + portable zip + launch smoke, no update
+      # feed: keyward is a key vault and does not update itself yet —
+      # the release ships with plain SHA256SUMS for integrity.
+      - name: Release (DMG + portable zip)
+        run: raco rivet release --without-updates --development
+      - name: Family naming + checksums
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCH="${{ matrix.arch }}"
+          cd dist
+          # rivet names the portable zip in family form already; only
+          # the DMG lacks the architecture.
+          mv "keyward-${VERSION}-macos.dmg" "keyward-${VERSION}-macos-${ARCH}.dmg"
+          for f in keyward-*.dmg keyward-*.zip; do
+            [ -f "$f" ] || continue
+            [ -f "$f.sha256" ] || shasum -a 256 "$f" > "$f.sha256"
+          done
+      # The sbom/notices bodies stay in the CI artifact only; the
+      # release carries installers and their sidecars, nothing else.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: dist/keyward-*
+
+  publish:
+    name: Publish
+    needs: [macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Gather + publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          for a in macos-arm64 macos-x64; do
+            cp -R "artifacts/$a/." dist/
+          done
+          awk -v header="## [${VERSION}]" '
+            index($0, header) == 1 {on=1; next}
+            on && /^## / {exit}
+            on {print}
+          ' CHANGELOG.md > /tmp/notes.md
+          test -s /tmp/notes.md || { echo "empty release notes" >&2; exit 1; }
+          cd dist
+          for f in *.sha256; do [ -s "$f" ] || rm -f "$f"; done
+          cat *.sha256 > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Keyward ${VERSION}" \
+            --notes-file /tmp/notes.md \
+            --latest \
+            *.dmg *.zip *.sha256 SHA256SUMS

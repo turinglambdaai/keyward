@@ -9,6 +9,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Pinned so CI validates the same rivet the release workflow ships with.
+env:
+  RIVET_PIN: v0.11.0
+
 jobs:
   engine:
     name: Engine tests + backend compile
@@ -19,8 +23,8 @@ jobs:
         with:
           version: stable
           distribution: full
-      - name: Install deps (Rivet from catalog, docs/ci.md standard)
-        run: raco pkg install --auto --no-docs crypto rivet
+      - name: Install deps (docs/ci.md standard; rivet pinned)
+        run: raco pkg install --auto --no-docs crypto 'https://github.com/turinglambdaai/rivet.git#${{ env.RIVET_PIN }}'
       - name: Engine tests
         run: raco test tests/
       - name: Backend compiles against the RVT1 contract
@@ -36,5 +40,5 @@ jobs:
         with:
           version: stable
           distribution: full
-      - run: raco pkg install --auto --no-docs rivet crypto
+      - run: raco pkg install --auto --no-docs crypto 'https://github.com/turinglambdaai/rivet.git#${{ env.RIVET_PIN }}'
       - run: raco rivet build
