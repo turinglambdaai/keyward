@@ -625,6 +625,52 @@ private struct SnapshotsSheet: View {
     }
 }
 
+// ---- about sheet --------------------------------------------------------------
+
+/// About (Help ▸ About): version, product line, license, site and the
+/// issue tracker — a bug report starts one click from the failure it
+/// describes. Keyward is AGPL-3.0, so the license line names it plainly.
+struct AboutSheet: View {
+    @EnvironmentObject private var model: KeywardModel
+    @Environment(\.dismiss) private var dismiss
+
+    private var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? RivetGeneratedConfig.version
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "key")
+                .font(.system(size: 44))
+                .foregroundStyle(model.theme.accent)
+            Text("Keyward v\(version)")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(model.theme.onSurface)
+            Text("A signing-key vault over your synced INI file — local by design.")
+                .font(.system(size: 12))
+                .foregroundStyle(model.theme.secondaryText)
+                .multilineTextAlignment(.center)
+            Text("Released under the GNU AGPL-3.0")
+                .font(.system(size: 11))
+                .foregroundStyle(model.theme.secondaryText)
+            HStack(spacing: 20) {
+                Link("keyward.jrtx.site",
+                     destination: URL(string: "https://keyward.jrtx.site")!)
+                Link("Report an Issue",
+                     destination: URL(string:
+                        "https://github.com/turinglambdaai/keyward/issues")!)
+            }
+            .font(.system(size: 12))
+            Button("Done") { dismiss() }
+                .keyboardShortcut(.defaultAction)
+        }
+        .padding(28)
+        .frame(width: 360)
+        .background(model.theme.background)
+    }
+}
+
 private struct SnapshotRowView: View {
     @EnvironmentObject private var model: KeywardModel
     let snap: SnapshotRow

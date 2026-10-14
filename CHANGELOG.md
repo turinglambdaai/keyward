@@ -5,7 +5,26 @@ All notable changes to Keyward are documented here. Format follows
 
 ## Unreleased
 
-## 0.1.0 - 2026-10-13
+Foundation round — feedback surfaces, no vault behaviour change.
+
+### Added
+
+- **Help ▸ About**: an About sheet carrying the `Keyward v<version>`
+  line (bundle version, falling back to the generated Rivet config), the
+  product line ("local by design"), the AGPL-3.0 license line, the site
+  (keyward.jrtx.site) and a Report-an-Issue link to the GitHub tracker —
+  a bug report starts one click from the failure it describes.
+- **GitHub issue templates** (bug report + feature request) so feedback
+  lands structured and safe: the bug form asks for the vault location
+  shape and names what must never be pasted — key values and section
+  bodies — while pointing at fingerprints as the shareable identifier.
+
+### Fixed
+
+- The 0.1.0 entry's date now reads 2026-10-14, the day the release
+  actually shipped.
+
+## 0.1.0 - 2026-10-14
 
 ### Added
 

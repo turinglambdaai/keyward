@@ -16,6 +16,9 @@ struct RivetHostApp: App {
                 .environmentObject(model)
                 .frame(minWidth: 860, minHeight: 560)
                 .task { model.start() }
+                .sheet(isPresented: $model.aboutVisible) {
+                    AboutSheet().environmentObject(model)
+                }
         }
         .defaultSize(width: 1180, height: 760)
         .commands {
@@ -23,6 +26,7 @@ struct RivetHostApp: App {
             CommandGroup(replacing: .toolbar) {}
             CommandGroup(replacing: .sidebar) {}
             CommandGroup(replacing: .help) {
+                Button("About Keyward") { model.aboutVisible = true }
                 Button("User Guide — 使用手册") {
                     if let url = URL(string:
                         "https://github.com/turinglambdaai/keyward/blob/main/docs/GUIDE.zh-CN.md") {
@@ -121,6 +125,7 @@ final class KeywardModel: ObservableObject {
     @Published var statusMessage: String?
     @Published var errorMessage: String?
     @Published var snapshotsVisible = false
+    @Published var aboutVisible = false
     @Published var openStoreRequested = false
     @Published var isDark = false
 
