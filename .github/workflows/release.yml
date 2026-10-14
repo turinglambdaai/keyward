@@ -126,6 +126,8 @@ jobs:
           - { arch: arm64, runner: ubuntu-24.04-arm, racket-arch: arm64 }
     steps:
       - uses: actions/checkout@v4
+      # The ref is a literal — `uses:` cannot expand ${{ env.RIVET_PIN }};
+      # keep it in sync with RIVET_PIN above when bumping rivet.
       - name: Set up embeddable Racket CS
         uses: turinglambdaai/rivet/.github/actions/setup-embed-racket@v0.11.0
       # Installed after the embeddable runtime so the catalog dependency

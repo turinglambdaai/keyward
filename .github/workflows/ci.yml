@@ -95,7 +95,9 @@ jobs:
             libgtk-4-dev libadwaita-1-dev libjson-glib-dev \
             libsecret-1-dev libglib2.0-dev
       # Builds and caches the embeddable Racket CS runtime and exports
-      # RIVET_RACKET_* (rivet's own composite action).
+      # RIVET_RACKET_* (rivet's own composite action). The ref is a literal:
+      # `uses:` cannot expand ${{ env.RIVET_PIN }} — keep it in sync with
+      # RIVET_PIN above when bumping rivet.
       - name: Set up embeddable Racket CS
         uses: turinglambdaai/rivet/.github/actions/setup-embed-racket@v0.11.0
       # Installed after the embeddable runtime so the catalog dependency
