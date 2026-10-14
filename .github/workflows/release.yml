@@ -83,7 +83,10 @@ jobs:
           for a in macos-arm64 macos-x64; do
             cp -R "artifacts/$a/." dist/
           done
-          awk -v header="## [${VERSION}]" '
+          # Keep-a-Changelog section: "## 0.1.0 - 2026-10-13" — match the
+          # version followed by a space (or end of line), not a bracketed
+          # form; a trailing " .0" suffix must not match "0.1".
+          awk -v header="## ${VERSION} " '
             index($0, header) == 1 {on=1; next}
             on && /^## / {exit}
             on {print}
