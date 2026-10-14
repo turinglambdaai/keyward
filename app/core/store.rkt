@@ -58,7 +58,11 @@
 ;; and the host should ask. ~/Sync/Keys is our own layout, never an
 ;; assumption about other users.
 (define (store-path-default)
-  (define home-default (expand-user-path "~/Sync/Keys/secrets.ini"))
+  ;; find-system-path, not expand-user-path: rivet's codegen instantiates
+  ;; this module on every host platform, and Windows Racket rejects `~`
+  ;; paths outright ("bad username in path").
+  (define home-default
+    (build-path (find-system-path 'home-dir) "Sync" "Keys" "secrets.ini"))
   (or (config-get "store")
       (let ([env (getenv "KEYWARD_STORE")])
         (and env (not (string=? env "")) env))
