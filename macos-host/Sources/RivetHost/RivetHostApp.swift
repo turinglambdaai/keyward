@@ -175,18 +175,15 @@ final class KeywardModel: ObservableObject {
                                     fingerprint: $0.count > 3 ? $0[3] : "",
                                     status: $0.count > 4 ? $0[4] : "")
                     }
-                    await MainActor.run {
-                        guard let self else { return }
-                        self.storePath = path
-                        self.products = parsed
-                        self.ready = true
-                        self.status = "Connected — \(parsed.count) products"
-                    }
+                    // Unwrap off the main actor, then await a MainActor
+                    // method: sending a @MainActor-isolated instance to its
+                    // own actor never needs Sendable — the MainActor.run
+                    // closure form trips older toolchains (Xcode 16.4).
+                    guard let self else { return }
+                    await self.bootstrapSucceeded(path: path, products: parsed)
                 } catch {
-                    await MainActor.run {
-                        self?.ready = false
-                        self?.status = "Backend error: \(error)"
-                    }
+                    guard let self else { return }
+                    await self.bootstrapFailed(error)
                 }
             }
         } catch {
@@ -196,6 +193,18 @@ final class KeywardModel: ObservableObject {
 
     // T: Sendable — the result crosses an isolation boundary; older
     // toolchains (e.g. Xcode 16.4) reject the unconstrained form.
+    func bootstrapSucceeded(path: String, products: [ProductInfo]) {
+        storePath = path
+        self.products = products
+        ready = true
+        status = "Connected — \(products.count) products"
+    }
+
+    func bootstrapFailed(_ error: Error) {
+        ready = false
+        status = "Backend error: \(error)"
+    }
+
     private func call<T: Sendable>(_ what: String, _ body: @escaping (RivetAPI) async throws -> T,
                          then post: @escaping (T) -> Void) {
         guard let backend, ready else { return }
