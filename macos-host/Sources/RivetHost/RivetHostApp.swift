@@ -194,7 +194,9 @@ final class KeywardModel: ObservableObject {
         }
     }
 
-    private func call<T>(_ what: String, _ body: @escaping (RivetAPI) async throws -> T,
+    // T: Sendable — the result crosses an isolation boundary; older
+    // toolchains (e.g. Xcode 16.4) reject the unconstrained form.
+    private func call<T: Sendable>(_ what: String, _ body: @escaping (RivetAPI) async throws -> T,
                          then post: @escaping (T) -> Void) {
         guard let backend, ready else { return }
         Task {
