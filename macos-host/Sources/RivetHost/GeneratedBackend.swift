@@ -28,51 +28,51 @@ public struct RivetAPI: Sendable {
     public init(client: RivetClient) { self.client = client }
 
     public func check_store() async throws -> [[String]] {
-        let result = try await client.call("check-store", arguments: [])
-        return try decode__List_List_String_(result)
+        let rivetResult = try await client.call("check-store", arguments: [])
+        return try decode__List_List_String_(rivetResult)
     }
     public func entry_delete(product: String, name: String) async throws -> Bool {
-        let result = try await client.call("entry-delete", arguments: [encode_String(product), encode_String(name)])
-        return try decode_Bool(result)
+        let rivetResult = try await client.call("entry-delete", arguments: [encode_String(product), encode_String(name)])
+        return try decode_Bool(rivetResult)
     }
     public func entry_get(product: String, name: String) async throws -> String {
-        let result = try await client.call("entry-get", arguments: [encode_String(product), encode_String(name)])
-        return try decode_String(result)
+        let rivetResult = try await client.call("entry-get", arguments: [encode_String(product), encode_String(name)])
+        return try decode_String(rivetResult)
     }
     public func entry_import_file(product: String, name: String, file_path: String) async throws -> String {
-        let result = try await client.call("entry-import-file", arguments: [encode_String(product), encode_String(name), encode_String(file_path)])
-        return try decode_String(result)
+        let rivetResult = try await client.call("entry-import-file", arguments: [encode_String(product), encode_String(name), encode_String(file_path)])
+        return try decode_String(rivetResult)
     }
     public func entry_list(product: String) async throws -> [[String]] {
-        let result = try await client.call("entry-list", arguments: [encode_String(product)])
-        return try decode__List_List_String_(result)
+        let rivetResult = try await client.call("entry-list", arguments: [encode_String(product)])
+        return try decode__List_List_String_(rivetResult)
     }
     public func entry_set(product: String, name: String, value: String) async throws -> String {
-        let result = try await client.call("entry-set", arguments: [encode_String(product), encode_String(name), encode_String(value)])
-        return try decode_String(result)
+        let rivetResult = try await client.call("entry-set", arguments: [encode_String(product), encode_String(name), encode_String(value)])
+        return try decode_String(rivetResult)
     }
     public func keypair_generate(product: String) async throws -> [String] {
-        let result = try await client.call("keypair-generate", arguments: [encode_String(product)])
-        return try decode__List_String_(result)
+        let rivetResult = try await client.call("keypair-generate", arguments: [encode_String(product)])
+        return try decode__List_String_(rivetResult)
     }
     public func snapshot_list() async throws -> [[String]] {
-        let result = try await client.call("snapshot-list", arguments: [])
-        return try decode__List_List_String_(result)
+        let rivetResult = try await client.call("snapshot-list", arguments: [])
+        return try decode__List_List_String_(rivetResult)
     }
     public func snapshot_restore(stamp: String) async throws -> Bool {
-        let result = try await client.call("snapshot-restore", arguments: [encode_String(stamp)])
-        return try decode_Bool(result)
+        let rivetResult = try await client.call("snapshot-restore", arguments: [encode_String(stamp)])
+        return try decode_Bool(rivetResult)
     }
     public func store_info() async throws -> [[String]] {
-        let result = try await client.call("store-info", arguments: [])
-        return try decode__List_List_String_(result)
+        let rivetResult = try await client.call("store-info", arguments: [])
+        return try decode__List_List_String_(rivetResult)
     }
     public func store_open(path: String) async throws -> String {
-        let result = try await client.call("store-open", arguments: [encode_String(path)])
-        return try decode_String(result)
+        let rivetResult = try await client.call("store-open", arguments: [encode_String(path)])
+        return try decode_String(rivetResult)
     }
     public func store_path() async throws -> String {
-        let result = try await client.call("store-path", arguments: [])
-        return try decode_String(result)
+        let rivetResult = try await client.call("store-path", arguments: [])
+        return try decode_String(rivetResult)
     }
 }

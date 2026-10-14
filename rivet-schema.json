@@ -1,21 +1,34 @@
 {
   "device-rpcs": [],
   "enums": [],
-  "events": [
-    {
-      "name": "notification",
-      "type": {
-        "kind": "scalar",
-        "name": "String"
-      }
-    }
-  ],
+  "events": [],
   "format": "rivet-schema",
   "format-version": 1,
   "records": [],
   "rpcs": [
     {
+      "arguments": [],
+      "name": "check-store",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
       "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
         {
           "name": "name",
           "type": {
@@ -24,7 +37,30 @@
           }
         }
       ],
-      "name": "greet",
+      "name": "entry-delete",
+      "result": {
+        "kind": "scalar",
+        "name": "Bool"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "entry-get",
       "result": {
         "kind": "scalar",
         "name": "String"
@@ -33,28 +69,173 @@
     {
       "arguments": [
         {
-          "name": "message",
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "file-path",
           "type": {
             "kind": "scalar",
             "name": "String"
           }
         }
       ],
-      "name": "notify",
+      "name": "entry-import-file",
       "result": {
         "kind": "scalar",
-        "name": "Void"
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "entry-list",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "value",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "entry-set",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "keypair-generate",
+      "result": {
+        "element": {
+          "kind": "scalar",
+          "name": "String"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "snapshot-list",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "stamp",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "snapshot-restore",
+      "result": {
+        "kind": "scalar",
+        "name": "Bool"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "store-info",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "path",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "store-open",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "store-path",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
       }
     }
   ],
   "rvt-protocol": 1,
-  "states": [
-    {
-      "name": "counter",
-      "type": {
-        "kind": "scalar",
-        "name": "Int64"
-      }
-    }
-  ]
+  "states": []
 }
