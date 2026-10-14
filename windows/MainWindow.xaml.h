@@ -19,17 +19,95 @@ struct MainWindow : MainWindowT<MainWindow> {
   // the console-control shutdown hook (logoff/CTRL events).
   void StopBackendOrderly();
 
-  void Increment_Click(winrt::Windows::Foundation::IInspectable const& sender,
-                       Microsoft::UI::Xaml::RoutedEventArgs const& args);
+  // Menu handlers
+  void OnChooseVault(winrt::Windows::Foundation::IInspectable const&,
+                     Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void OnDeepCheck(winrt::Windows::Foundation::IInspectable const&,
+                   Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void OnSnapshots(winrt::Windows::Foundation::IInspectable const&,
+                   Microsoft::UI::Xaml::RoutedEventArgs const&);
+  winrt::fire_and_forget OnAbout(
+      winrt::Windows::Foundation::IInspectable const&,
+      Microsoft::UI::Xaml::RoutedEventArgs const&);
+  winrt::fire_and_forget OnGuide(
+      winrt::Windows::Foundation::IInspectable const&,
+      Microsoft::UI::Xaml::RoutedEventArgs const&);
 
  private:
+  // Rows exactly as the engine returns them (app/backend.rkt header comment).
+  struct ProductInfo {
+    std::wstring name;
+    std::wstring entries;
+    std::wstring key_id;
+    std::wstring fingerprint;
+    std::wstring status;
+  };
+  struct EntryRow {
+    std::string name;
+    std::string state;
+  };
+  struct CheckRow {
+    std::wstring name;
+    std::wstring kind;
+    std::wstring fingerprint;
+    std::wstring paired;
+    std::wstring status;
+  };
+  struct SnapshotRow {
+    std::string stamp;
+    std::string size;
+  };
+
   winrt::fire_and_forget InitializeBackendAsync();
-  void IncrementAsync();
+
+  // Status-bar message lines.
   void SetReadyUi();
   void SetErrorUi(std::string const& message);
+  void SetStatusMessage(std::wstring const& message);
 
+  // RPC flows. Every completion hops through the DispatcherQueue before it
+  // touches XAML state; the backend is captured by value so a window closed
+  // mid-call never destroys the last reference on a reader thread.
+  void BootstrapStore();
+  void RefreshProducts(std::function<void()> then);
+  void CheckAll();
+  void SelectProduct(std::wstring const& name);
+  void CopyEntry(EntryRow const& entry);
+  void SetEntry(std::wstring const& name, std::wstring const& value);
+  void DeleteEntry(std::string const& name);
+  void ImportKey(std::string const& name,
+                 std::filesystem::path const& file_path);
+  void GenerateUpdateKey();
+  void LoadSnapshots();
+  void RestoreSnapshot(SnapshotRow const& snap);
+  void OpenStoreAsync(std::wstring const& path);
+
+  // Rendering (plain rebuild — the row counts are vault-scale small).
+  void RenderSidebar();
+  void RenderDetail();
+  winrt::Microsoft::UI::Xaml::UIElement MakeEntryCard(EntryRow const& entry);
+
+  // Dialogs and pickers.
+  winrt::fire_and_forget NewEntryDialogAsync();
+  winrt::fire_and_forget ConfirmDeleteAsync(std::string name);
+  winrt::fire_and_forget ConfirmGenerateKeyAsync();
+  winrt::fire_and_forget SnapshotsDialogAsync();
+  winrt::fire_and_forget OpenVaultPickAsync();
+  winrt::fire_and_forget ImportKeyPickAsync(std::string name);
+  winrt::fire_and_forget ShowEngineMessage(std::string message);
+
+  bool ready_{false};
   std::shared_ptr<rivet::windows::Backend> backend_;
-  std::atomic<std::int64_t> count_{0};
+  std::vector<ProductInfo> products_;
+  std::vector<CheckRow> checks_;
+  std::vector<EntryRow> entries_;
+  std::vector<SnapshotRow> snapshots_;
+  std::wstring selected_;
+  std::wstring store_path_;
+  // While the snapshots dialog is open, LoadSnapshots completions re-render
+  // its rows through this (also fires on the first load, which lands after
+  // the dialog is already up).
+  std::shared_ptr<std::function<void()>> snapshot_refresher_;
 };
 
 }  // namespace winrt::RivetHost::implementation

@@ -3,35 +3,183 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid Padding="32">
-        <StackPanel
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Spacing="16"
-            Width="320">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <MenuBar Grid.Row="0">
+            <MenuBarItem Title="File">
+                <MenuFlyoutItem
+                    x:Name="ChooseVaultItem"
+                    Text="Choose Vault…"
+                    Click="OnChooseVault">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="O" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+            </MenuBarItem>
+            <MenuBarItem Title="Vault">
+                <MenuFlyoutItem
+                    x:Name="DeepCheckItem"
+                    Text="Deep Check"
+                    Click="OnDeepCheck"
+                    IsEnabled="False">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="R" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    x:Name="SnapshotsItem"
+                    Text="Snapshots"
+                    Click="OnSnapshots"
+                    IsEnabled="False">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="L" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+            </MenuBarItem>
+            <MenuBarItem Title="Help">
+                <MenuFlyoutItem Text="About Keyward" Click="OnAbout" />
+                <MenuFlyoutItem Text="User Guide — 使用手册" Click="OnGuide" />
+            </MenuBarItem>
+        </MenuBar>
+
+        <InfoBar
+            x:Name="StatusBar"
+            Grid.Row="1"
+            IsOpen="True"
+            IsClosable="False"
+            Severity="Informational"
+            Message="Starting embedded Racket CS…" />
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- sidebar: brand, summary tiles, product list -->
+            <ScrollViewer Grid.Column="0" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                <StackPanel Padding="12" Spacing="12">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Keyward" FontSize="17" FontWeight="Bold" />
+                        <TextBlock
+                            Text="release-signing key vault"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <Grid x:Name="SummaryGrid" ColumnSpacing="8" RowSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                    </Grid>
+                    <Grid>
+                        <TextBlock
+                            Text="Products"
+                            FontSize="13"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock
+                            Text="Ctrl+R deep check"
+                            FontSize="11"
+                            HorizontalAlignment="Right"
+                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                    </Grid>
+                    <StackPanel x:Name="ProductList" Spacing="4" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- detail pane: empty states or the selected product -->
+            <Grid Grid.Column="1">
+                <StackPanel
+                    x:Name="NoVaultPane"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="14">
+                    <TextBlock
+                        Text="🔑"
+                        FontSize="44"
+                        HorizontalAlignment="Center" />
+                    <TextBlock
+                        Text="No vault selected"
+                        FontSize="17"
+                        FontWeight="SemiBold"
+                        HorizontalAlignment="Center" />
+                    <TextBlock
+                        Text="Point Keyward at your secrets.ini — any vault in the same
+INI format works. The choice is remembered across launches."
+                        FontSize="13"
+                        TextAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Button
+                        Content="Choose Vault…"
+                        Style="{ThemeResource AccentButtonStyle}"
+                        HorizontalAlignment="Center"
+                        Click="OnChooseVault" />
+                </StackPanel>
+
+                <StackPanel
+                    x:Name="IntroPane"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="12">
+                    <TextBlock
+                        Text="🗝️"
+                        FontSize="40"
+                        HorizontalAlignment="Center" />
+                    <TextBlock
+                        Text="A local vault for release-signing keys"
+                        FontSize="16"
+                        FontWeight="SemiBold"
+                        HorizontalAlignment="Center" />
+                    <TextBlock
+                        Text="Pick a product on the left. Values are never displayed —
+they only ever leave through copy-to-clipboard."
+                        FontSize="13"
+                        TextAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+
+                <ScrollViewer x:Name="ProductPane" Visibility="Collapsed">
+                    <StackPanel x:Name="ProductDetail" Padding="20" Spacing="16" />
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <!-- status bar -->
+        <Grid
+            Grid.Row="3"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            Padding="12,6,12,6"
+            ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <TextBlock
-                Text="Rivet"
-                FontSize="32"
-                FontWeight="SemiBold" />
+                x:Name="StatusMessage"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                FontSize="12"
+                TextTrimming="CharacterEllipsis" />
             <TextBlock
-                Text="Racket + WinUI 3"
-                Opacity="0.65" />
-            <InfoBar
-                x:Name="StatusBar"
-                IsOpen="True"
-                IsClosable="False"
-                Severity="Informational"
-                Message="Starting embedded Racket CS…" />
-            <TextBlock
-                x:Name="CountText"
-                Text="Count: 0"
-                FontSize="24" />
-            <Button
-                x:Name="IncrementButton"
-                Content="Increment in Racket"
-                IsEnabled="False"
-                HorizontalAlignment="Stretch"
-                Click="Increment_Click" />
-        </StackPanel>
+                x:Name="StorePathText"
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                FontSize="11"
+                FontFamily="Consolas"
+                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                MaxLines="1"
+                TextTrimming="CharacterEllipsis" />
+        </Grid>
     </Grid>
 </Window>
