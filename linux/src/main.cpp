@@ -53,7 +53,8 @@ struct SnapshotRow {
 
 constexpr char const* kGuideUrl =
     "https://github.com/turinglambdaai/keyward/blob/main/docs/GUIDE.zh-CN.md";
-constexpr char const* kSiteUrl = "https://keyward.jrtx.site";
+constexpr char const* kIssuesUrl =
+    "https://github.com/turinglambdaai/keyward/issues";
 constexpr char const* kUpdateKeyName = "UPDATE_ED25519_PRIVATE_KEY_B64";
 
 struct AppState {
@@ -827,9 +828,12 @@ void show_about_dialog() {
       "A signing-key vault over your synced INI file — local by design.");
   gtk_about_dialog_set_license(GTK_ABOUT_DIALOG(dialog),
                                "Released under the GNU AGPL-3.0");
-  gtk_about_dialog_set_website(GTK_ABOUT_DIALOG(dialog), kSiteUrl);
+  // The GTK dialog carries a single website row (the taskly form); it
+  // points at the issue tracker — same Report an Issue surface as the
+  // macOS and Windows About sheets.
+  gtk_about_dialog_set_website(GTK_ABOUT_DIALOG(dialog), kIssuesUrl);
   gtk_about_dialog_set_website_label(GTK_ABOUT_DIALOG(dialog),
-                                     "keyward.jrtx.site");
+                                     "Report an Issue");
   gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(g_state.window));
   gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
   gtk_window_present(GTK_WINDOW(dialog));
