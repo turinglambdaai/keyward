@@ -54,7 +54,7 @@
       断的就是整条更新线。Keyward 把这件事变成点按钮。
     </p>
     <div class="cta">
-      <a class="btn btn-primary" href="#download" data-i18n="hero.download">获取 Keyward</a>
+      <a class="btn btn-primary" id="hero-download" href="#download" data-i18n="hero.download">获取 Keyward</a>
       <a class="btn btn-secondary" href="https://github.com/turinglambdaai/keyward" data-i18n="hero.source">查看源码</a>
     </div>
   </section>
@@ -132,11 +132,17 @@
   <section id="download" class="section alt">
     <h2 data-i18n="download-title">下载</h2>
     <div class="dl-grid">
-      <a class="dl-card" href="https://github.com/turinglambdaai/keyward/releases/latest">
+      <div class="dl-card">
         <h3 data-i18n="dl-mac-title">macOS（Apple Silicon / Intel）</h3>
-        <p data-i18n="dl-mac">DMG 安装器与便携 zip，arm64 / x64 双架构，随附逐件 SHA-256 与 SHA256SUMS 供校验。首个发布已上线。</p>
-        <span class="btn btn-primary" data-i18n="dl-mac-go">前往下载 →</span>
-      </a>
+        <p data-i18n="dl-mac">DMG 安装器与便携 zip，arm64 / x64 双架构，随附逐件 SHA-256 与 SHA256SUMS 供校验。v0.1.0 已发布。</p>
+        <a class="btn btn-primary" id="dl-mac-auto" href="https://github.com/turinglambdaai/keyward/releases/latest/download/keyward-macos-arm64.dmg" data-i18n="dl-mac-go">下载 DMG →</a>
+        <p class="dl-links muted">
+          <a href="https://github.com/turinglambdaai/keyward/releases/latest/download/keyward-macos-arm64.dmg">arm64 DMG</a> ·
+          <a href="https://github.com/turinglambdaai/keyward/releases/latest/download/keyward-macos-x64.dmg">x64 DMG</a> ·
+          <a href="https://github.com/turinglambdaai/keyward/releases/latest/download/SHA256SUMS">SHA256SUMS</a> ·
+          <a href="https://github.com/turinglambdaai/keyward/releases" data-i18n="dl-all">全部版本 →</a>
+        </p>
+      </div>
       <a class="dl-card" href="https://github.com/turinglambdaai/keyward/actions/workflows/ci.yml">
         <h3 data-i18n="dl-win-lin-title">Windows（x64）/ Linux</h3>
         <p data-i18n="dl-win-lin">WinUI 3 与 GTK4 原生壳随 M1 里程碑交付；当前库文件本身是跨平台纯文本 INI，可先从源码构建。</p>
@@ -207,13 +213,14 @@
       's3-body': 'Generate, import, edit, delete — each step snapshots first; restoring is one click. Values leave only through copy-to-clipboard, never a display.',
       'download-title': 'Download',
       'dl-mac-title': 'macOS (Apple Silicon / Intel)',
-      'dl-mac': 'DMG installers and portable zips for arm64 / x64, with per-file SHA-256 sidecars and a SHA256SUMS for verification. The first release is out.',
-      'dl-mac-go': 'Get it →',
+      'dl-mac': 'DMG installers and portable zips for arm64 / x64, with per-file SHA-256 sidecars and a SHA256SUMS for verification. v0.1.0 is out.',
+      'dl-mac-go': 'Download DMG →',
+      'dl-all': 'All releases →',
       'dl-win-lin-title': 'Windows (x64) / Linux',
       'dl-win-lin': 'WinUI 3 and GTK4 native hosts land with milestone M1; the vault file itself is already cross-platform plaintext INI, and the hosts build from source.',
       'dl-watch': 'Watch releases →',
       'dl-platforms-title': 'Platforms',
-      'dl-platforms-body': 'The first release is out: macOS installers (arm64 + x64, DMG + zip + SHA256SUMS). Windows / Linux native hosts land with M1. A developer tool — no mobile.',
+      'dl-platforms-body': 'v0.1.0 is out: macOS installers (arm64 + x64, DMG + zip + SHA256SUMS). Windows / Linux native hosts land with M1. A developer tool — no mobile.',
       'roadmap-title': 'Roadmap',
       'rm1': 'Windows / Linux native hosts — completing the three-platform installer matrix',
       'rm2': 'Rotation workflow: generate-next → promote, following the family runbook',
@@ -253,13 +260,14 @@
       's3-body': '生成、导入、修改、删除，每一步都先落快照；要回滚，恢复就是一次点击。值想用时复制进剪贴板，永不回显。',
       'download-title': '下载',
       'dl-mac-title': 'macOS（Apple Silicon / Intel）',
-      'dl-mac': 'DMG 安装器与便携 zip，arm64 / x64 双架构，随附逐件 SHA-256 与 SHA256SUMS 供校验。首个发布已上线。',
-      'dl-mac-go': '前往下载 →',
+      'dl-mac': 'DMG 安装器与便携 zip，arm64 / x64 双架构，随附逐件 SHA-256 与 SHA256SUMS 供校验。v0.1.0 已发布。',
+      'dl-mac-go': '下载 DMG →',
+      'dl-all': '全部版本 →',
       'dl-win-lin-title': 'Windows（x64）/ Linux',
       'dl-win-lin': 'WinUI 3 与 GTK4 原生壳随 M1 里程碑交付；当前库文件本身是跨平台纯文本 INI，可先从源码构建。',
       'dl-watch': '关注发布 →',
       'dl-platforms-title': '平台',
-      'dl-platforms-body': '首个发布已上线：macOS 安装包（arm64 + x64，DMG + zip + SHA256SUMS）。Windows / Linux 原生壳随 M1 交付。这是开发者工具，不做移动端。',
+      'dl-platforms-body': 'v0.1.0 已发布：macOS 安装包（arm64 + x64，DMG + zip + SHA256SUMS）。Windows / Linux 原生壳随 M1 交付。这是开发者工具，不做移动端。',
       'roadmap-title': '路线图',
       'rm1': 'Windows / Linux 原生壳，补齐三平台安装包',
       'rm2': '轮换工作流：generate-next → promote 两阶段，照 family runbook 走',
@@ -292,6 +300,29 @@
     document.documentElement.dataset.theme = next;
     localStorage.setItem('keyward-theme', next);
   });
+
+  // Direct downloads: on a Mac, point the hero button and the download
+  // card at releases/latest/download/keyward-macos-<arch>.dmg. The
+  // architecture comes from the GPU renderer string (Apple Silicon
+  // reports an Apple GPU, Intel Macs report Intel); anything ambiguous
+  // stays on arm64 — the dev-audience default. Non-Mac browsers keep
+  // the #download anchor, which explains the M1 hosts.
+  (function () {
+    if (!/Mac/.test(navigator.userAgent)) return;
+    var arch = 'arm64';
+    try {
+      var canvas = document.createElement('canvas');
+      var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      var ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      var renderer = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+      if (renderer && /intel/i.test(renderer)) arch = 'x64';
+    } catch (e) { /* keep arm64 */ }
+    var url = 'https://github.com/turinglambdaai/keyward/releases/latest/download/keyward-macos-' + arch + '.dmg';
+    var hero = document.getElementById('hero-download');
+    if (hero) hero.setAttribute('href', url);
+    var card = document.getElementById('dl-mac-auto');
+    if (card) card.setAttribute('href', url);
+  })();
 
   setLang(document.documentElement.lang === 'zh-CN' ? 'zh' : 'en');
 })();

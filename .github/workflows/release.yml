@@ -92,6 +92,13 @@ jobs:
           cd dist
           for f in *.sha256; do [ -s "$f" ] || rm -f "$f"; done
           cat *.sha256 > SHA256SUMS
+          # Stable direct links (site hero / docs point here):
+          #   releases/latest/download/keyward-macos-arm64.dmg
+          #   releases/latest/download/keyward-macos-x64.dmg
+          # The alias is a byte-for-byte copy of the arch-named asset, so
+          # the checksum sidecar of the suffixed name verifies it too.
+          cp "keyward-${VERSION}-macos-arm64.dmg" keyward-macos-arm64.dmg
+          cp "keyward-${VERSION}-macos-x64.dmg" keyward-macos-x64.dmg
           gh release create "$GITHUB_REF_NAME" \
             --title "Keyward ${VERSION}" \
             --notes-file /tmp/notes.md \

@@ -176,6 +176,9 @@ h1 { font-size: clamp(32px, 5vw, 46px); line-height: 1.15; margin: 0 0 18px; }
 }
 .dl-card h3 { margin: 0 0 8px; font-size: 16px; }
 .dl-card p { margin: 0 0 14px; color: var(--muted); font-size: 15px; }
+.dl-links { margin: 0; font-size: 13px; }
+.dl-links a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.dl-links a:hover { color: var(--ink); }
 .code {
   background: var(--chip-bg);
   border-radius: 8px;
