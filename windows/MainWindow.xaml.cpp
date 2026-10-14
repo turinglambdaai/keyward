@@ -290,6 +290,9 @@ void MainWindow::RefreshProducts(std::function<void()> then) {
                 }
                 window->RenderSidebar();
                 window->RenderDetail();
+                // Snapshots are not part of store_info; refresh the list
+                // so the sidebar tile shows the live count.
+                window->LoadSnapshots();
                 if (then) {
                   then();
                 }
@@ -512,6 +515,8 @@ void MainWindow::DeleteEntry(std::string const& name) {
                 window->SetStatusMessage(L"Deleted " + wide(name) +
                                          L" (snapshot taken)");
                 window->SelectProduct(window->selected_);
+                // The delete took a snapshot; refresh the sidebar count.
+                window->LoadSnapshots();
               }
             });
           } catch (std::exception const& e) {
@@ -633,10 +638,12 @@ void MainWindow::LoadSnapshots() {
                   window->snapshots_.push_back(std::move(snap));
                 }
                 // The open snapshots dialog re-renders its rows when the
-                // list lands (first load included).
+                // list lands (first load included); the sidebar tile
+                // re-renders with the fresh count.
                 if (window->snapshot_refresher_ != nullptr) {
                   (*window->snapshot_refresher_)();
                 }
+                window->RenderSidebar();
               }
             });
           } catch (std::exception const& e) {
@@ -711,6 +718,7 @@ void MainWindow::OpenStoreAsync(std::wstring const& path) {
                 window->selected_.clear();
                 window->checks_.clear();
                 window->entries_.clear();
+                window->snapshots_.clear();
                 window->RenderSidebar();
                 window->RenderDetail();
                 window->RefreshProducts(nullptr);
@@ -823,7 +831,8 @@ void MainWindow::RenderSidebar() {
                                     [](ProductInfo const& p) {
                                       return ToneIsWarn(p.status);
                                     }))));
-  tiles.Append(MakeTile(L"Snapshots", L"·"));
+  tiles.Append(MakeTile(L"Snapshots",
+                        std::to_wstring(snapshots_.size())));
   for (std::uint32_t i = 0; i < tiles.Size(); ++i) {
     auto tile = tiles.GetAt(i);
     mxc::Grid::SetColumn(tile.as<mxc::Border>(), i % 2);
