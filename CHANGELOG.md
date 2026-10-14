@@ -5,8 +5,9 @@ All notable changes to Keyward are documented here. Format follows
 
 ## [Unreleased]
 
-Windows and Linux hosts — the three-platform installer matrix closes;
-these entries land with the next release.
+## 0.2.0 - 2026-10-15
+
+Windows and Linux hosts — the three-platform installer matrix closes.
 
 ### Added
 
