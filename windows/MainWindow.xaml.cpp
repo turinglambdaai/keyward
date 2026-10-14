@@ -70,8 +70,10 @@ std::string utf8(std::filesystem::path const& path) {
   return utf8_from_wide(path.wstring());
 }
 
-mxt::FontWeight FontBold() { return mxt::FontWeights::Bold(); }
-mxt::FontWeight FontSemiBold() { return mxt::FontWeights::SemiBold(); }
+// The FontWeights statics live in Microsoft::UI::Text (payback precedent);
+// auto keeps the returned FontWeight type whatever the SDK projects.
+auto FontBold() { return mxt::FontWeights::Bold(); }
+auto FontSemiBold() { return mxt::FontWeights::SemiBold(); }
 
 rivet::windows::RacketRuntimeConfig runtime_config() {
   auto const exe = executable_path();
@@ -762,7 +764,7 @@ mx::UIElement MakeTile(std::wstring const& title, std::wstring const& count) {
   mxc::Grid::SetColumn(value, 1);
   row.Children().Append(label);
   row.Children().Append(value);
-  card.Content(row);
+  card.Child(row);
   return card;
 }
 
@@ -801,7 +803,7 @@ mx::UIElement MakeChip(std::wstring const& label, std::wstring const& value,
   content.TextTrimming(mx::TextTrimming::CharacterEllipsis);
   row.Children().Append(key);
   row.Children().Append(content);
-  chip.Content(row);
+  chip.Child(row);
   return chip;
 }
 
@@ -976,7 +978,7 @@ void MainWindow::RenderDetail() {
         check.status != L"ok"));
     header_stack.Children().Append(check_chips);
   }
-  header.Content(header_stack);
+  header.Child(header_stack);
   children.Append(header);
 
   // ---- entries section ----
@@ -1143,7 +1145,7 @@ mx::UIElement MainWindow::MakeEntryCard(EntryRow const& entry) {
   grid.Children().Append(name);
   grid.Children().Append(tail);
   grid.Children().Append(more_button);
-  card.Content(grid);
+  card.Child(grid);
   return card;
 }
 
