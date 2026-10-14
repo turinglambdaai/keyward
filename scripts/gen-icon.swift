@@ -58,3 +58,54 @@ let dest = CGImageDestinationCreateWithURL(out as CFURL, UTType.png.identifier a
 CGImageDestinationAddImage(dest, img, nil)
 CGImageDestinationFinalize(dest)
 print("wrote \(out.path)")
+
+// Optional second argument: the Windows .ico (rivet.rktd's windows-icon).
+// PNG-compressed entries across the standard size ladder — Explorer list
+// view, taskbar and title bar each pick a crisp scale instead of one
+// blurry 256 px downscale (same output chain as podlens' make-icons.py).
+if CommandLine.arguments.count > 2 {
+    func le16(_ value: UInt16, into data: inout Data) {
+        withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
+    }
+    func le32(_ value: UInt32, into data: inout Data) {
+        withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
+    }
+
+    let sizes = [16, 24, 32, 48, 64, 128, 256]
+    var blobs: [Data] = []
+    for edge in sizes {
+        let icoCtx = CGContext(data: nil, width: edge, height: edge,
+                               bitsPerComponent: 8, bytesPerRow: 0,
+                               space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        icoCtx.interpolationQuality = .high
+        icoCtx.draw(img, in: CGRect(x: 0, y: 0, width: CGFloat(edge), height: CGFloat(edge)))
+        let scaled = icoCtx.makeImage()!
+        let data = NSMutableData()
+        let icoDest = CGImageDestinationCreateWithData(
+            data, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(icoDest, scaled, nil)
+        CGImageDestinationFinalize(icoDest)
+        blobs.append(data as Data)
+    }
+
+    var ico = Data()
+    le16(0, into: &ico)                       // reserved
+    le16(1, into: &ico)                       // type: icon
+    le16(UInt16(sizes.count), into: &ico)     // entry count
+    var offset = 6 + 16 * sizes.count
+    for (index, edge) in sizes.enumerated() {
+        ico.append(UInt8(edge == 256 ? 0 : edge))  // width (0 means 256)
+        ico.append(UInt8(edge == 256 ? 0 : edge))  // height
+        ico.append(0)                              // palette color count
+        ico.append(0)                              // reserved
+        le16(1, into: &ico)                        // color planes
+        le16(32, into: &ico)                       // bits per pixel
+        le32(UInt32(blobs[index].count), into: &ico)
+        le32(UInt32(offset), into: &ico)
+        offset += blobs[index].count
+    }
+    for blob in blobs { ico.append(blob) }
+    try! ico.write(to: URL(fileURLWithPath: CommandLine.arguments[2]))
+    print("wrote \(CommandLine.arguments[2])")
+}
