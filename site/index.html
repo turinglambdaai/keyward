@@ -143,9 +143,9 @@
           <a href="https://github.com/turinglambdaai/keyward/releases" data-i18n="dl-all">全部版本 →</a>
         </p>
       </div>
-      <a class="dl-card" href="https://github.com/turinglambdaai/keyward/actions/workflows/ci.yml">
+      <a class="dl-card" href="https://github.com/turinglambdaai/keyward/releases">
         <h3 data-i18n="dl-win-lin-title">Windows（x64）/ Linux</h3>
-        <p data-i18n="dl-win-lin">WinUI 3 与 GTK4 原生壳随 M1 里程碑交付；当前库文件本身是跨平台纯文本 INI，可先从源码构建。</p>
+        <p data-i18n="dl-win-lin">WinUI 3 与 GTK4 原生壳随下一个版本（v0.2.0）交付：Windows 为 MSI + 便携 zip，Linux 为 x64/arm64 的 deb、rpm、AppImage、tar.gz；库文件本身是跨平台纯文本 INI，此前可先从源码构建。</p>
         <span class="btn btn-secondary" data-i18n="dl-watch">关注发布 →</span>
       </a>
       <div class="dl-card">
@@ -156,7 +156,7 @@
           <span class="chip">Linux</span>
         </p>
         <p class="muted" data-i18n="dl-platforms-body">
-          首个发布已上线：macOS 安装包（arm64 + x64，DMG + zip + SHA256SUMS）。Windows / Linux 原生壳随 M1 交付。这是开发者工具，不做移动端。
+          首个发布已上线：macOS 安装包（arm64 + x64，DMG + zip + SHA256SUMS）。Windows / Linux 原生壳随下一个版本（v0.2.0）交付。这是开发者工具，不做移动端。
         </p>
       </div>
     </div>
@@ -217,10 +217,10 @@
       'dl-mac-go': 'Download DMG →',
       'dl-all': 'All releases →',
       'dl-win-lin-title': 'Windows (x64) / Linux',
-      'dl-win-lin': 'WinUI 3 and GTK4 native hosts land with milestone M1; the vault file itself is already cross-platform plaintext INI, and the hosts build from source.',
+      'dl-win-lin': 'WinUI 3 and GTK4 native hosts ship with the next release (v0.2.0): an MSI plus portable zip on Windows, and deb, rpm, AppImage and tar.gz for Linux x64 + arm64. The vault file itself is already cross-platform plaintext INI, so you can build from source until then.',
       'dl-watch': 'Watch releases →',
       'dl-platforms-title': 'Platforms',
-      'dl-platforms-body': 'v0.1.0 is out: macOS installers (arm64 + x64, DMG + zip + SHA256SUMS). Windows / Linux native hosts land with M1. A developer tool — no mobile.',
+      'dl-platforms-body': 'v0.1.0 is out: macOS installers (arm64 + x64, DMG + zip + SHA256SUMS). Windows / Linux native hosts land with the next release (v0.2.0). A developer tool — no mobile.',
       'roadmap-title': 'Roadmap',
       'rm1': 'Windows / Linux native hosts — completing the three-platform installer matrix',
       'rm2': 'Rotation workflow: generate-next → promote, following the family runbook',
@@ -264,10 +264,10 @@
       'dl-mac-go': '下载 DMG →',
       'dl-all': '全部版本 →',
       'dl-win-lin-title': 'Windows（x64）/ Linux',
-      'dl-win-lin': 'WinUI 3 与 GTK4 原生壳随 M1 里程碑交付；当前库文件本身是跨平台纯文本 INI，可先从源码构建。',
+      'dl-win-lin': 'WinUI 3 与 GTK4 原生壳随下一个版本（v0.2.0）交付：Windows 为 MSI + 便携 zip，Linux 为 x64/arm64 的 deb、rpm、AppImage、tar.gz；库文件本身是跨平台纯文本 INI，此前可先从源码构建。',
       'dl-watch': '关注发布 →',
       'dl-platforms-title': '平台',
-      'dl-platforms-body': 'v0.1.0 已发布：macOS 安装包（arm64 + x64，DMG + zip + SHA256SUMS）。Windows / Linux 原生壳随 M1 交付。这是开发者工具，不做移动端。',
+      'dl-platforms-body': 'v0.1.0 已发布：macOS 安装包（arm64 + x64，DMG + zip + SHA256SUMS）。Windows / Linux 原生壳随下一个版本（v0.2.0）交付。这是开发者工具，不做移动端。',
       'roadmap-title': '路线图',
       'rm1': 'Windows / Linux 原生壳，补齐三平台安装包',
       'rm2': '轮换工作流：generate-next → promote 两阶段，照 family runbook 走',
@@ -306,7 +306,7 @@
   // architecture comes from the GPU renderer string (Apple Silicon
   // reports an Apple GPU, Intel Macs report Intel); anything ambiguous
   // stays on arm64 — the dev-audience default. Non-Mac browsers keep
-  // the #download anchor, which explains the M1 hosts.
+  // the #download anchor, which explains the upcoming hosts.
   (function () {
     if (!/Mac/.test(navigator.userAgent)) return;
     var arch = 'arm64';
