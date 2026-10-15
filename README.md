@@ -47,12 +47,14 @@ discipline layer over it, not a lock-in.
 
 ## Status
 
-M0 shipped: **v0.1.0 is out** — macOS installers (arm64 / x64, DMG + zip with
-SHA256SUMS) on the [Releases page](https://github.com/turinglambdaai/keyward/releases/latest).
-Windows (WinUI 3) and Linux (GTK4) hosts are built and CI-covered now; their
-installers land with the next release (v0.2.0). Roadmap: rotation workflow
-(generate-next → promote, following the two-phase runbook), stray-key scanner
-for working trees, Sparkle/Tauri key format import and export.
+**v0.2.0 is out** — installers for all three desktops on the
+[Releases page](https://github.com/turinglambdaai/keyward/releases/latest):
+macOS (arm64 / x64, DMG + zip), Windows (x64, MSI + zip) and Linux (x64 /
+arm64, deb + rpm + AppImage + tar.gz + zip), each with a SHA-256 sidecar.
+The Windows (WinUI 3) and Linux (GTK4) hosts are built and CI-covered.
+Roadmap: rotation workflow (generate-next → promote, following the
+two-phase runbook), stray-key scanner for working trees, Sparkle/Tauri key
+format import and export.
 
 ## Security model
 
