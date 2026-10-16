@@ -6,6 +6,10 @@ All notable changes to Keyward are documented here. Format follows
 ## [Unreleased]
 
 ### Fixed
+- The summary-tile count could wrap under width pressure: "Products 15"
+  folded into a vertical "1/5" that read as two mystery numbers. Counts
+  are now single-line, fixed-size and monospaced, taking layout priority
+  over the label.
 
 - **The vault failed to load on every launch when a default path resolved.**
   The `store-path` RPC ran the active store through `path->string`, and

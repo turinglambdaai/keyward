@@ -132,8 +132,14 @@ private struct SummaryTile: View {
             Spacer(minLength: 4)
             if let count {
                 Text("\(count)")
-                    .font(.system(size: 12))
+                    .font(.system(size: 12, weight: .medium))
+                    .monospacedDigit()
                     .foregroundStyle(theme.secondaryText)
+                    // the count must never wrap or compress: "15" folding into
+                    // a vertical "1/5" reads as two mystery numbers
+                    .lineLimit(1)
+                    .fixedSize()
+                    .layoutPriority(2)
             }
         }
         .padding(.horizontal, 8)
