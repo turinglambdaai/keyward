@@ -5,6 +5,18 @@ All notable changes to Keyward are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The vault failed to load on every launch when a default path resolved.**
+  The `store-path` RPC ran the active store through `path->string`, and
+  Racket 9.3 tightened it to reject strings outright — so any user whose
+  default chain (persisted choice → `KEYWARD_STORE` →
+  `~/Sync/Keys/secrets.ini`) produced the string form saw "No vault
+  selected" plus a `path->string: contract violation` backend error
+  instead of their products. The active store is now kept as a plain
+  string end to end, and `store-open` normalizes the `simple-form-path`
+  output before it enters `current-store`.
+
 ## 0.2.0 - 2026-10-15
 
 Windows and Linux hosts — the three-platform installer matrix closes.

@@ -37,18 +37,25 @@
 
 ;; ---- store -----------------------------------------------------------------
 
+;; the active store is kept as a plain string end to end: Racket 9.3's
+;; path->string rejects strings outright ("contract violation expected:
+;; path?"), so a path object must never enter current-store
+
 (define-rpc (store-path : String)
   (define p (current-store))
-  (if p (path->string p) ""))
+  (cond [(string? p) p]
+        [(path? p) (path->string p)]
+        [else ""]))
 
 (define-rpc (store-open [path String] : String)
   (define p (simple-form-path (string-trim path)))
   (unless (file-exists? p) (error 'store-open "no such store: ~a" p))
-  (current-store p)
+  (define ps (path->string p))
+  (current-store ps)
   ;; remember the choice across launches — the config holds a path, never a
   ;; secret; the family path is only a fallback, never an assumption
-  (config-set! "store" (path->string p))
-  (path->string p))
+  (config-set! "store" ps)
+  ps)
 
 ;; light listing: emptiness only, no crypto — cheap enough for the sidebar
 (define-rpc (store-info : (List (List String)))
