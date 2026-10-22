@@ -135,3 +135,9 @@ nearby compiler output when diagnosing a failure.
   call frame.
 - The Keys folder itself has its own manual (`~/Sync/Keys/AGENTS.md`) —
   boundary there: product signing keys only, no API tokens.
+
+## 组合定位（Portfolio placement）
+
+- 轨道与授权：轨道 4 社区引流；授权形态：AGPL-3.0；商业归属：永久免费（安全工具开源即信任；家族发布基础设施）。
+- 组合归属唯一权威：[PORTFOLIO.md](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/PORTFOLIO.md)（turinglambdaai.github.io 仓库）。改归属/授权先改权威档，再同步本节。
+- 纪律：价格只进本仓 `PRICING.md`，且收费开始时才发布；README 与产品站不做价格预告。
