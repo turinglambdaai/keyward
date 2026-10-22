@@ -1,8 +1,8 @@
 # Keyward
 
-A local vault for the release-signing keys of self-updating desktop apps.
+**English** · [中文](README.zh-CN.md)
 
-English | 中文见下方
+A local vault for the release-signing keys of self-updating desktop apps.
 
 [![CI](https://github.com/turinglambdaai/keyward/actions/workflows/ci.yml/badge.svg)](https://github.com/turinglambdaai/keyward/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/turinglambdaai/keyward)](https://github.com/turinglambdaai/keyward/releases)
@@ -76,16 +76,6 @@ raco rivet package    # distributable
   wire surface shared by every future host)
 - macOS UI: `macos-host/Sources/RivetHost/`
 - Windows UI: `windows/` · Linux UI: `linux/`
-
-## 中文简介
-
-Keyward 是给"自己会更新的桌面应用"保管发布签名钥匙的本地保险库：私钥签
-更新清单、公钥嵌在已装应用里验签——Sparkle、Tauri updater、electron-updater
-全都是这一套，缺的从来都是私钥的日常托管。Keyward 建在自家 Rivet 线上
-（Racket 引擎 + 原生壳），库文件就是你自己的同步盘里的明文 INI；它往上加
-纪律：值永不显示只进剪贴板、每次改动先快照（防丢）、深度校验（解析/配对/
-指纹，一条命令替代一堆手工 openssl）、生成即入库（杜绝散件）。安全模型
-= 信任设备间的明文同步 + 各机全盘加密，引擎零网络代码。
 
 ## License
 
