@@ -6,6 +6,11 @@ All notable changes to Keyward are documented here. Format follows
 ## [Unreleased]
 
 ### Fixed
+
+- Deep check now evaluates every private entry and all public anchors within its purpose. A valid update key no longer hides a corrupt or mismatched license key; multiple safe fingerprints remain labelled within the existing RPC row layout. Empty private entries are reported as unreadable. Regression coverage uses generated temporary keys only.
+
+
+### Fixed
 - The summary-tile count could wrap under width pressure: "Products 15"
   folded into a vertical "1/5" that read as two mystery numbers. Counts
   are now single-line, fixed-size and monospaced, taking layout priority

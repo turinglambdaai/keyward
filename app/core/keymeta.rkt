@@ -12,12 +12,14 @@
          (only-in crypto/libcrypto libcrypto-factory)
          net/base64
          racket/format
+         racket/list
          racket/match
          racket/string)
 
 (crypto-factories (list libcrypto-factory))
 
-(provide key-summary
+(provide key-summaries
+         key-summary
          value->der
          private-key-from-der
          public-key-of
@@ -93,65 +95,89 @@
           (spki-der (public-key-of priv))))
 
 ;; ---- summaries ----------------------------------------------------------------
-;; entries: (listof (cons NAME value)) — analyze the first readable private
-;; key and report whether any stored public entry matches it.
 
+;; Analyze every private entry, including empty/malformed values. Public anchors
+;; are selected by the same purpose prefix (UPDATE_ED25519_, LICENSE_, ...).
+;; A valid key from another trust domain must never make a section look paired.
 (define private-name-rx #px"PRIVATE")
-(define known-private-names
-  '("UPDATE_ED25519_PRIVATE_KEY_B64"
-    "UPDATE_ED25519_PRIVATE_KEY"
-    "UPDATER_PRIVATE_KEY"
-    "LICENSE_PRIVATE_KEY"))
 
-(define (key-summary entries)
-  (define priv-entry
-    (or (for/first ([e (in-list entries)]
-                    #:when (and (member (car e) known-private-names)
-                                (not (string=? (cdr e) ""))))
-          e)
-        (for/first ([e (in-list entries)]
-                    #:when (and (regexp-match? private-name-rx (car e))
-                                (not (string=? (cdr e) ""))))
-          e)))
+(define (summary kind fingerprint paired status)
+  (list (cons 'kind kind) (cons 'fingerprint fingerprint)
+        (cons 'paired paired) (cons 'status status)))
+
+(define (summary-ref value key)
+  (cdr (assq key value)))
+
+(define (private-entry-summary priv-entry entries)
+  (define der (value->der (cdr priv-entry)))
+  (define key (and der (private-key-from-der der)))
   (cond
-    [(not priv-entry) (list (cons 'kind "-") (cons 'fingerprint "-")
-                            (cons 'paired "-") (cons 'status "no-key"))]
+    [(not key) (summary "?" "-" "-" "key-unreadable")]
     [else
-     (define der (value->der (cdr priv-entry)))
-     (define key (and der (private-key-from-der der)))
-     (cond
-       [(not key) (list (cons 'kind "?") (cons 'fingerprint "-")
-                        (cons 'paired "-") (cons 'status "key-unreadable"))]
-       [else
-        (define kind (or (kind-of key) "unknown"))
-        (define spki (spki-der (public-key-of key)))
-        (define fp (fingerprint-of-der spki))
-        (define raw32 (and (string=? kind "ed25519") (= (bytes-length spki) 44)
-                           (subbytes spki 12)))
-        ;; public material may be stored two ways: as decodable key bytes
-        ;; (PUBLIC_KEY entries) or as a bare fingerprint (…_FPR entries)
-        (define pub-entries
-          (for/list ([e (in-list entries)]
-                     #:when (and (regexp-match? #px"PUBLIC" (car e))
-                                 (not (string=? (cdr e) ""))))
-            e))
-        (define (matches? name value)
-          (cond [(regexp-match? #px"_FPR$" name)
-                 (and (string? value)
-                      (string=? (string-downcase (string-trim value)) fp))]
-                [else
-                 (define der* (value->bytes value))
-                 (and der*
-                      (or (equal? der* spki)
-                          (and raw32 (= (bytes-length der*) 32) (equal? der* raw32))))]))
-        (define paired (cond [(null? pub-entries) "missing-public"]
-                             [(ormap (lambda (e) (matches? (car e) (cdr e))) pub-entries) "yes"]
-                             [else "no"]))
-        (define status
-          (cond [(string=? paired "yes") "ok"]
-                [(string=? paired "missing-public") "missing-public"]
-                [else "pair-mismatch"]))
-        (list (cons 'kind kind)
-              (cons 'fingerprint fp)
-              (cons 'paired paired)
-              (cons 'status status))])]))
+     (define kind (or (kind-of key) "unknown"))
+     (define spki (spki-der (public-key-of key)))
+     (define fp (fingerprint-of-der spki))
+     (define raw32 (and (string=? kind "ed25519") (= (bytes-length spki) 44)
+                       (subbytes spki 12)))
+     (define purpose (cadr (regexp-match #px"^(.*?)PRIVATE" (car priv-entry))))
+     (define pub-entries
+       (for/list ([e (in-list entries)]
+                  #:when (and (string-prefix? (car e) purpose)
+                              (string-prefix? (substring (car e) (string-length purpose))
+                                              "PUBLIC")
+                              (not (string=? (cdr e) ""))))
+         e))
+     (define (matches? entry)
+       (define name (car entry))
+       (define value (cdr entry))
+       (cond
+         [(regexp-match? #px"_FPR$" name)
+          (string=? (string-downcase (string-trim value)) fp)]
+         [else
+          (define stored (value->bytes value))
+          (and stored
+               (or (equal? stored spki)
+                   (and raw32 (= (bytes-length stored) 32)
+                        (equal? stored raw32))))]))
+     ;; Every declared anchor must agree, not merely one of several forms.
+     (define paired (cond [(null? pub-entries) "missing-public"]
+                          [(andmap matches? pub-entries) "yes"]
+                          [else "no"]))
+     (summary kind fp paired
+              (cond [(string=? paired "yes") "ok"]
+                    [(string=? paired "missing-public") "missing-public"]
+                    [else "pair-mismatch"]))]))
+
+;; Safe per-entry results for diagnostics; values never leave this module.
+(define (key-summaries entries)
+  (for/list ([e (in-list entries)]
+             #:when (regexp-match? private-name-rx (car e)))
+    (cons (car e) (private-entry-summary e entries))))
+
+;; Preserve the product's existing row layout and status vocabulary. A section
+;; is green only if every private key and each of its public anchors is green.
+;; Multiple fingerprints are labelled by entry name instead of showing only the
+;; first one; native hosts can display the result without an RPC/schema change.
+(define (key-summary entries)
+  (define per-key (key-summaries entries))
+  (cond
+    [(null? per-key) (summary "-" "-" "-" "no-key")]
+    [(null? (cdr per-key)) (cdar per-key)]
+    [else
+     (define states (map (lambda (entry) (summary-ref (cdr entry) 'status)) per-key))
+     (define status
+       (or (for/first ([failure (in-list '("key-unreadable" "pair-mismatch" "missing-public"))]
+                       #:when (member failure states))
+             failure)
+           "ok"))
+     (summary
+      (string-join (remove-duplicates
+                    (map (lambda (entry) (summary-ref (cdr entry) 'kind)) per-key)) ", ")
+      (string-join
+       (map (lambda (entry)
+              (format "~a=~a" (car entry) (summary-ref (cdr entry) 'fingerprint))) per-key)
+       "; ")
+      (cond [(string=? status "ok") "yes"]
+            [(string=? status "missing-public") "missing-public"]
+            [else "no"])
+      status)]))
