@@ -172,3 +172,7 @@ nearby compiler output when diagnosing a failure.
 - 当前执行入口：[产品审查 issue](https://github.com/turinglambdaai/keyward/issues/3)。先保证每个私钥都有独立解析/配对结果，不能用一个正确 key 掩盖同节其他坏 key。维持明文可逃生格式和引擎零网络；用合成临时密钥验证。
 - 开工先检查干净工作树与远端，以 fast-forward-only 更新并记录 SHA；共享文件一次一个写入者，保留其他 checkout 的未提交工作。
 - 每次只完成一个可验收切片，记录 owned files、依赖 pin、命令/平台/产物证据和回滚。已实现、已发布、实机验收分别陈述；不修改 requirements 或复用旧证据来制造通过。
+
+## Public product documentation
+
+The paired `docs/USER-GUIDE.md` / `docs/USER-GUIDE.zh-CN.md` own the public installation, first-use, data/recovery, privacy and availability path. Keep the homepage and both README entry points aligned with them when behavior changes. Detailed technical contracts and the current implementation queue retain their existing owners. Do not publish target prices, a purchase link or a ready/secure/platform claim before its release evidence exists.

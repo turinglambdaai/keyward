@@ -25,6 +25,8 @@ var _hmt = _hmt || [];
   s.parentNode.insertBefore(hm, s);
 })();
 </script>
+<style>.lang-menu li.lang-choice{padding:0}.lang-menu .lang-choice button{display:block;width:100%;padding:8px 12px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}.lang-menu .lang-choice button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;border-radius:4px}</style>
+<style>.guide-status{margin:20px 0;padding:16px 20px;border:1px solid currentColor;border-radius:10px;font-size:.95rem;line-height:1.65}.guide-status p{margin:0 0 8px}.guide-status a{text-decoration:underline;text-underline-offset:4px}html:lang(en) .reader-zh,html:lang(zh) .reader-en{display:none!important}</style>
 </head>
 <body>
 <header class="nav">
@@ -44,8 +46,8 @@ var _hmt = _hmt || [];
           <span id="current-lang-label">English</span>
         </button>
         <ul class="lang-menu">
-          <li onclick="setLanguage('en')">English</li>
-          <li onclick="setLanguage('zh')">简体中文</li>
+          <li class="lang-choice"><button type="button" onclick="setLanguage('en')">English</button></li>
+          <li class="lang-choice"><button type="button" onclick="setLanguage('zh')">简体中文</button></li>
         </ul>
       </div>
       <button class="theme-btn" id="theme-btn" aria-label="Toggle theme">◐</button>
@@ -57,6 +59,7 @@ var _hmt = _hmt || [];
 <section class="hero">
   <p class="kicker" data-i18n="kicker">使用手册 · 双语 · 面向第一次接触更新签名的你</p>
   <h1 data-i18n="title">Keyward 使用手册</h1>
+<aside class="guide-status"><p class="reader-en " lang="en">Free release-infrastructure tool under AGPL-3.0; no commercial activation.</p><p class="reader-zh " lang="zh">AGPL-3.0 许可的免费发布基础设施工具，不接商业激活。</p><a class="reader-en" lang="en" href="https://github.com/turinglambdaai/keyward/blob/main/docs/USER-GUIDE.md">Current installation, privacy and recovery</a><a class="reader-zh" lang="zh" href="https://github.com/turinglambdaai/keyward/blob/main/docs/USER-GUIDE.zh-CN.md">当前安装、隐私与恢复</a></aside>
   <p class="lede" data-i18n="lede">
     这本手册面向<strong>第一次接触更新签名</strong>的用户。它不假设你懂任何密码学，
     也不假设你用过任何类似工具。跟着章节一步步做，你会完成：
@@ -112,7 +115,7 @@ var _hmt = _hmt || [];
 
   <h3 data-i18n="ch0-3-t">0.3 Keyward 不管什么</h3>
   <ul>
-    <li data-i18n="ch0-3-a">它<strong>不发出任何网络请求</strong>——引擎里没有网络代码，钥匙不出你的电脑；</li>
+    <li data-i18n="ch0-3-a">密钥库引擎不联网；剪贴板与用户自选同步文件夹仍可能将私钥复制到其他进程或设备。密钥库是明文 INI，不等于硬件安全模块。</li>
     <li data-i18n="ch0-3-b">它<strong>不管理</strong>网站 API key、npm token、SSH 私钥这类东西（只放产品更新/发布签名钥）；</li>
     <li data-i18n="ch0-3-c">它<strong>不发明新格式</strong>——库就是一个纯文本 INI 文件，放在你自己的同步盘里，任何编辑器都能打开它。</li>
   </ul>
@@ -411,7 +414,7 @@ raco rivet package     # 产物在 dist/keyward.app</code></pre>
       'ch0-2-f': 'After a rotation, an old copy of the key survived in some corner and was forgotten.',
       'ch0-2-g': '<strong>Keyward exists to manage exactly this</strong>: a desktop app that keeps the signing keys of all your products in one file (in your own sync folder) and enforces four disciplines — values are never displayed (copy-only), every change snapshots first (one-click restore), one-click health check (is the key readable, do the key pairs match), and in-app generation lands straight in the vault (no stray files, ever).',
       'ch0-3-t': '0.3 What Keyward does not do',
-      'ch0-3-a': 'It <strong>sends no network requests</strong> — the engine contains no network code; keys never leave your machine;',
+      'ch0-3-a': "The vault engine makes no network requests. Clipboard operations and a user-chosen sync folder can copy private keys to other processes/devices. The vault is plaintext INI, not a hardware security module.",
       'ch0-3-b': 'It does <strong>not manage</strong> website API keys, npm tokens, SSH private keys and the like (only product update/release signing keys);',
       'ch0-3-c': 'It <strong>invents no new format</strong> — the vault is a plain-text INI file in your own sync folder, openable by any editor.',
       'ch1': '1. Install & first launch',
@@ -548,7 +551,7 @@ raco rivet package     # 产物在 dist/keyward.app</code></pre>
       'ch0-2-f': '轮换了新钥，某个角落里的旧钥副本忘了删。',
       'ch0-2-g': '<strong>Keyward 就是管这些的</strong>：它给你一个桌面界面，把所有产品的签名钥匙集中在一个文件里（放在你自己的同步盘），并替你守住四条纪律——值永不显示（只能复制）、每次改动先自动快照（丢了能一键恢复）、一键体检（钥匙是否健康、公私钥是否配对）、生成钥匙直接入库（不留任何散落文件）。',
       'ch0-3-t': '0.3 Keyward 不管什么',
-      'ch0-3-a': '它<strong>不发出任何网络请求</strong>——引擎里没有网络代码，钥匙不出你的电脑；',
+      'ch0-3-a': "密钥库引擎不联网；剪贴板与用户自选同步文件夹仍可能将私钥复制到其他进程或设备。密钥库是明文 INI，不等于硬件安全模块。",
       'ch0-3-b': '它<strong>不管理</strong>网站 API key、npm token、SSH 私钥这类东西（只放产品更新/发布签名钥）；',
       'ch0-3-c': '它<strong>不发明新格式</strong>——库就是一个纯文本 INI 文件，放在你自己的同步盘里，任何编辑器都能打开它。',
       'ch1': '1. 安装与首次启动',

@@ -37,6 +37,12 @@ Keyward 是一个守护这些密钥的小型桌面应用。建在家族 Rivet �
 保险库格式是纯 INI（`[product]` 小节、`NAME = value`、注释保留），
 始终是唯一事实来源——Keyward 是它之上的纪律层，不是锁定。
 
+## 开始使用
+
+AGPL-3.0 许可的免费发布基础设施工具，不接商业激活。 提供 macOS、Windows、Linux 桌面预览。连接真实发布凭据前，先使用可丢弃的合成密钥库。
+
+[安装、首次使用、隐私与备份恢复](docs/USER-GUIDE.zh-CN.md) · [English](docs/USER-GUIDE.md)
+
 ## 状态
 
 **v0.2.0 已发布**——三个桌面的安装包都在
@@ -70,13 +76,3 @@ raco rivet package    # 分发产物
 ## License
 
 AGPL-3.0
-
-## 反馈与诊断
-
-问题和建议请使用 [GitHub Issues](https://github.com/turinglambdaai/keyward/issues)，附版本、系统/架构和复现步骤。分享前先检查并脱敏诊断；不要公开 API key、授权凭据、密钥库或私有文档。安全敏感问题优先按 SECURITY.md 联系；未提供私密渠道时，先请求私下联系方式，不在公开 issue 中披露敏感细节。此入口不会自动上传数据。
-
-深度校验按用途逐个检查所有私钥与对应公钥材料；同节的更新签名钥不会掩盖授权签名钥的问题。多钥节只有全部通过才显示通过，摘要只包含名称、指纹和状态，不包含密钥值。
-
-## 产品政策
-
-Keyward 是免费的安全与发布基础设施，不计划付费层，也不按密钥数量收费。完整边界见[中文政策](PRICING.zh-CN.md)或 [English policy](PRICING.md)，现行源码许可不变。

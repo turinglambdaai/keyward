@@ -30,6 +30,13 @@ var _hmt = _hmt || [];
   #product-support a:focus-visible { outline:2px solid currentColor; outline-offset:4px; }
   html:lang(en) #product-support .support-zh, html:lang(zh) #product-support .support-en { display:none; }
 </style>
+<style id="product-start-style">
+.product-availability{font-size:.95rem;line-height:1.65;max-width:72ch;margin:18px 0;opacity:.85} .hero .product-availability{margin-left:auto;margin-right:auto}
+.product-start{max-width:1120px;margin:64px auto;padding:32px 24px;border-top:1px solid var(--border,#aaa);font:inherit;line-height:1.65}
+.product-start h2{font-size:clamp(1.7rem,3vw,2.4rem);letter-spacing:-.025em;margin:0 0 16px}.product-start h3{font-size:1.05rem;margin:0 0 10px}.product-start p{margin:0 0 16px;max-width:74ch}.product-start-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin:28px 0}.product-start a{text-decoration:underline;text-underline-offset:4px;overflow-wrap:anywhere}.product-start a:focus-visible{outline:2px solid currentColor;outline-offset:5px}.product-start .start-links{display:flex;gap:16px 24px;flex-wrap:wrap}.product-start .start-status{font-weight:600}.product-start .start-limits{font-size:.95em}
+html:lang(en) .reader-zh,html:lang(zh) .reader-en{display:none!important}@media(max-width:700px){.product-start{margin:40px auto;padding:24px 20px}.product-start-grid{grid-template-columns:1fr;gap:18px}}
+</style>
+<style>.lang-menu li.lang-choice{padding:0}.lang-menu .lang-choice button{display:block;width:100%;padding:8px 12px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}.lang-menu .lang-choice button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;border-radius:4px}</style>
 </head>
 <body>
 <header class="nav">
@@ -48,8 +55,8 @@ var _hmt = _hmt || [];
           <span id="current-lang-label">English</span>
         </button>
         <ul class="lang-menu">
-          <li onclick="setLanguage('en')">English</li>
-          <li onclick="setLanguage('zh')">简体中文</li>
+          <li class="lang-choice"><button type="button" onclick="setLanguage('en')">English</button></li>
+          <li class="lang-choice"><button type="button" onclick="setLanguage('zh')">简体中文</button></li>
         </ul>
       </div>
       <button class="theme-btn" id="theme-btn" aria-label="Toggle theme">◐</button>
@@ -61,6 +68,7 @@ var _hmt = _hmt || [];
   <section class="hero">
     <p class="kicker" data-i18n="kicker">本地保险库 · 值不显示 · 零网络</p>
     <h1 data-i18n="hero-title">给你的更新签名钥，一个像样的家。</h1>
+<p class="reader-en product-availability" lang="en">Development preview. Free release-infrastructure tool under AGPL-3.0; no commercial activation.</p><p class="reader-zh product-availability" lang="zh">开发预览。AGPL-3.0 许可的免费发布基础设施工具，不接商业激活。</p>
     <p class="lede" data-i18n="hero-lede">
       桌面应用的在线更新全靠同一套信任模型：私钥签更新清单，公钥嵌在
       已装应用里验签——Sparkle、Tauri、electron-updater、WinSparkle 都
@@ -192,13 +200,16 @@ var _hmt = _hmt || [];
       <li><strong>M4</strong> — <span data-i18n="rm4">生态兼容：Sparkle / Tauri updater / electron-updater 钥格式导入导出</span></li>
     </ul>
   </section>
+<section id="start-here" class="product-start" aria-label="Get started / 开始使用">
+<h2 class="reader-en " lang="en">Start with one useful session.</h2><h2 class="reader-zh " lang="zh">从一次有效使用开始。</h2><p class="reader-en start-status" lang="en">Free release-infrastructure tool under AGPL-3.0; no commercial activation.</p><p class="reader-zh start-status" lang="zh">AGPL-3.0 许可的免费发布基础设施工具，不接商业激活。</p><p class="reader-en " lang="en">Desktop previews for macOS, Windows and Linux. Use a synthetic disposable vault before connecting real release credentials.</p><p class="reader-zh " lang="zh">提供 macOS、Windows、Linux 桌面预览。连接真实发布凭据前，先使用可丢弃的合成密钥库。</p><div class="product-start-grid"><article><h3 class="reader-en " lang="en">01</h3><h3 class="reader-zh " lang="zh">01</h3><p class="reader-en " lang="en">Create a temporary test vault; inspect entry names and fingerprints rather than displaying private values.</p><p class="reader-zh " lang="zh">建立临时测试库；查看条目名称和指纹，不展示私钥值。</p></article><article><h3 class="reader-en " lang="en">02</h3><h3 class="reader-zh " lang="zh">02</h3><p class="reader-en " lang="en">Validate each key pair and inspect every reported failure separately. One valid key does not validate all keys in a section.</p><p class="reader-zh " lang="zh">逐个校验密钥对，分别处理每个失败结果；一个密钥正确不表示整个节均正确。</p></article><article><h3 class="reader-en " lang="en">03</h3><h3 class="reader-zh " lang="zh">03</h3><p class="reader-en " lang="en">Rehearse backup and a two-stage rotation on test keys before changing the key used by installed applications.</p><p class="reader-zh " lang="zh">先用测试密钥演练备份和两阶段轮换，再修改已安装应用信任的发布密钥。</p></article></div><p class="reader-en start-limits" lang="en">Multi-key validation was corrected in <a href="https://github.com/turinglambdaai/keyward/issues/4">#4</a>. Backup/restore, orphan detection, clipboard exposure and packaged release evidence still require the work tracked in <a href="https://github.com/turinglambdaai/keyward/issues/3">#3</a>; do not infer a security certification.</p><p class="reader-zh start-limits" lang="zh">多密钥校验已由 <a href="https://github.com/turinglambdaai/keyward/issues/4">#4</a> 修正。备份恢复、孤立条目检测、剪贴板暴露与打包发布证据仍需按 <a href="https://github.com/turinglambdaai/keyward/issues/3">#3</a> 推进；不构成安全认证。</p><div class="start-links"><a class="reader-en" lang="en" href="https://github.com/turinglambdaai/keyward/blob/main/docs/USER-GUIDE.md">Installation, privacy &amp; recovery</a><a class="reader-zh" lang="zh" href="https://github.com/turinglambdaai/keyward/blob/main/docs/USER-GUIDE.zh-CN.md">安装、隐私与恢复</a><a href="https://github.com/turinglambdaai/keyward/issues"><span class="reader-en " lang="en">Get help</span><span class="reader-zh " lang="zh">反馈与帮助</span></a></div>
+</section>
 </main>
 
 <footer>
   <span>AGPL-3.0 · <a href="https://github.com/turinglambdaai/keyward">github.com/turinglambdaai/keyward</a></span>
   <span data-i18n="footer-note">引擎零网络代码；库文件永远在你自己的同步盘里。明文同步是信任设备间的设计决策，防失窃交给各机全盘加密。</span>
 </footer>
-<nav id="product-support" aria-label="Support / 支持"><a href="https://github.com/turinglambdaai/keyward/issues"><span class="support-zh">反馈</span><span class="support-en" lang="en">Feedback</span></a> <a href="https://github.com/turinglambdaai/keyward/releases"><span class="support-zh">发布与更新</span><span class="support-en" lang="en">Releases</span></a> <a href="https://github.com/turinglambdaai/keyward/blob/main/LICENSE"><span class="support-zh">源码许可</span><span class="support-en" lang="en">Source license</span></a> <a class="support-zh" href="https://github.com/turinglambdaai/keyward/blob/main/PRICING.zh-CN.md">产品政策</a> <a class="support-en" lang="en" href="https://github.com/turinglambdaai/keyward/blob/main/PRICING.md">Product policy</a></nav>
+<nav id="product-support" aria-label="Support / 支持"><a href="https://github.com/turinglambdaai/keyward/issues"><span class="support-zh">反馈</span><span class="support-en" lang="en">Feedback</span></a> <a href="https://github.com/turinglambdaai/keyward/releases"><span class="support-zh">发布与更新</span><span class="support-en" lang="en">Releases</span></a> <a href="https://github.com/turinglambdaai/keyward/blob/main/LICENSE"><span class="support-zh">源码许可</span><span class="support-en" lang="en">Source license</span></a> <a class="support-zh" href="https://github.com/turinglambdaai/keyward/blob/main/docs/USER-GUIDE.zh-CN.md">产品政策</a> <a class="support-en" lang="en" href="https://github.com/turinglambdaai/keyward/blob/main/docs/USER-GUIDE.md">Product policy</a></nav>
 
 <script>
 (function () {

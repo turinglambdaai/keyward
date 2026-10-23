@@ -47,6 +47,12 @@ The vault format is plain INI (`[product]` sections, `NAME = value`,
 comments preserved) and stays the single source of truth — Keyward is a
 discipline layer over it, not a lock-in.
 
+## Start here
+
+Free release-infrastructure tool under AGPL-3.0; no commercial activation. Desktop previews for macOS, Windows and Linux. Use a synthetic disposable vault before connecting real release credentials.
+
+[Installation, first use, privacy, backup and recovery](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
+
 ## Status
 
 **v0.2.0 is out** — installers for all three desktops on the
@@ -82,15 +88,3 @@ raco rivet package    # distributable
 ## License
 
 AGPL-3.0
-
-## Delivery priorities (2026-10-23)
-
-The current product review issue linked from AGENTS owns the next bounded slice and its acceptance scenarios. Follow the existing product specification and the [family delivery standard](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/docs/PRODUCT-STANDARD.md). Hardware, native-platform and live-payment gates remain explicit; this documentation update does not claim they passed.
-
-## Feedback and diagnostics
-
-Report reproducible bugs and feature requests through [GitHub Issues](https://github.com/turinglambdaai/keyward/issues). Include the release, OS/architecture and steps; inspect and redact diagnostics before sharing. Do not post API keys, license files, vault contents or private documents. For sensitive security reports, follow SECURITY.md when present; otherwise request a private contact route without disclosing sensitive details. Nothing is uploaded automatically.
-
-## Product policy
-
-Keyward is free security and release infrastructure. No paid tier or charge by key count is planned. Read the full [English policy](PRICING.md) or [简体中文](PRICING.zh-CN.md); source-license rights remain unchanged.
