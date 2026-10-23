@@ -90,3 +90,7 @@ The current product review issue linked from AGENTS owns the next bounded slice 
 ## Feedback and diagnostics
 
 Report reproducible bugs and feature requests through [GitHub Issues](https://github.com/turinglambdaai/keyward/issues). Include the release, OS/architecture and steps; inspect and redact diagnostics before sharing. Do not post API keys, license files, vault contents or private documents. For sensitive security reports, follow SECURITY.md when present; otherwise request a private contact route without disclosing sensitive details. Nothing is uploaded automatically.
+
+## Product policy
+
+Keyward is free security and release infrastructure. No paid tier or charge by key count is planned. Read the full [English policy](PRICING.md) or [简体中文](PRICING.zh-CN.md); source-license rights remain unchanged.
