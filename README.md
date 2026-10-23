@@ -34,7 +34,9 @@ your own synced folder and adds the discipline a plaintext store lacks:
 - **Deep check.** Parses each key (Ed25519 / RSA PKCS#8, base64-DER,
   base64-PEM or bare PEM), derives the public half, computes the fingerprint,
   and pairs it against the stored public material — the audit that used to be
-  a pile of hand-run openssl commands.
+  a pile of hand-run openssl commands. Every private entry is checked against
+  all public anchors of the same purpose; a section passes only when every
+  private key passes, with each fingerprint labelled in multi-key sections.
 - **Collect, don't scatter.** In-app keypair generation writes straight into
   the vault; PEM imports land as single-line base64 values. No stray key
   files, even momentarily.
@@ -80,3 +82,11 @@ raco rivet package    # distributable
 ## License
 
 AGPL-3.0
+
+## Delivery priorities (2026-10-23)
+
+The current product review issue linked from AGENTS owns the next bounded slice and its acceptance scenarios. Follow the existing product specification and the [family delivery standard](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/docs/PRODUCT-STANDARD.md). Hardware, native-platform and live-payment gates remain explicit; this documentation update does not claim they passed.
+
+## Feedback and diagnostics
+
+Report reproducible bugs and feature requests through [GitHub Issues](https://github.com/turinglambdaai/keyward/issues). Include the release, OS/architecture and steps; inspect and redact diagnostics before sharing. Do not post API keys, license files, vault contents or private documents. For sensitive security reports, follow SECURITY.md when present; otherwise request a private contact route without disclosing sensitive details. Nothing is uploaded automatically.

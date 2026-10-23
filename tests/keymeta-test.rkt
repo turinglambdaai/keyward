@@ -7,6 +7,7 @@
          rackunit
          racket/format
          racket/list
+         racket/string
          "../app/core/keymeta.rkt")
 
 (define (b64 btes) (bytes->string/utf-8 (base64-encode btes "")))
@@ -94,3 +95,46 @@
 (for ([e (in-list (key-summary (list (cons "UPDATE_ED25519_PRIVATE_KEY_B64" (b64 priv-der))
                                      (cons "UPDATE_ED25519_PUBLIC_KEY_SPKI_B64" (b64 spki)))))])
   (check-true (<= (string-length (cdr e)) 64)))
+
+;; A valid update key must not hide a second, corrupt or mismatched license
+;; key. Pairing anchors are scoped to the private entry's purpose.
+(define update-pair
+  (list (cons "UPDATE_ED25519_PRIVATE_KEY_B64" (b64 priv-der))
+        (cons "UPDATE_ED25519_PUBLIC_KEY_SPKI_B64" (b64 spki))))
+(define (summary-status entries)
+  (cdr (assoc 'status (key-summary entries))))
+(check-equal? (summary-status
+               (append update-pair (list (cons "LICENSE_PRIVATE_KEY" "invalid"))))
+              "key-unreadable")
+(check-equal? (summary-status
+               (append update-pair
+                       (list (cons "LICENSE_PRIVATE_KEY" (b64 other-priv))
+                             (cons "LICENSE_PUBLIC_KEY" (b64 spki)))))
+              "pair-mismatch")
+
+(define two-pairs
+  (append update-pair
+          (list (cons "LICENSE_PRIVATE_KEY" (b64 other-priv))
+                (cons "LICENSE_PUBLIC_KEY_FPR" (fingerprint-of-der other-spki)))))
+(check-equal? (summary-status two-pairs) "ok")
+(check-equal? (summary-status (reverse two-pairs)) "ok")
+(check-equal? (length (key-summaries two-pairs)) 2)
+(check-equal? (summary-status
+               (append update-pair (list (cons "LICENSE_PRIVATE_KEY" ""))))
+              "key-unreadable")
+(check-equal? (summary-status
+               (append update-pair
+                       (list (cons "LICENSE_PRIVATE_KEY" (b64 other-priv)))))
+              "missing-public")
+(define safe-summary (format "~s" (key-summaries two-pairs)))
+(check-false (string-contains? safe-summary (b64 priv-der)))
+(check-false (string-contains? safe-summary (b64 other-priv)))
+(check-equal? (summary-status
+               (list (cons "LICENSE_PRIVATE_KEY" (b64 priv-der))
+                     (cons "UPDATE_ED25519_PUBLIC_KEY_SPKI_B64" (b64 spki))))
+              "missing-public")
+(check-equal? (summary-status
+               (append update-pair
+                       (list (cons "UPDATE_ED25519_PUBLIC_KEY_RAW_TAIL32_B64"
+                                   (b64 (subbytes other-spki 12))))))
+              "pair-mismatch")
