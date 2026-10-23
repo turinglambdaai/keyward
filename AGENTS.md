@@ -1,5 +1,9 @@
 # Rivet agent contract
 
+## Authorization decision before implementation
+
+Decision `2026-10-auth-1`: No commercial Permit credentials, Commerce checkout or licensing account. Read the complete [local authorization decision](PRICING.md#authorization-decision-for-implementation) and its Chinese counterpart before commercial, trial, update-eligibility or credential work. Record this decision revision and the source/policy SHAs actually read in the PR/handoff. Refresh at each bounded slice; existing agent conversations do not receive this change automatically. Follow the existing product contract and implementation issue; do not activate a payment gate merely because a plan exists.
+
 ## Required policy discovery at each slice
 
 Before starting the next bounded slice, refresh remote state safely and re-read
