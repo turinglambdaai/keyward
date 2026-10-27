@@ -297,12 +297,12 @@ char const* entry_purpose_hint(std::string const& name) {
 constexpr char kOwnedCopyMime[] = "application/x-keyward-owned-copy";
 
 // Copy with the ownership marker. Returns TRUE when the local claim was
-// taken; the caller schedules the expiry only then.
+// taken; the caller schedules the expiry only then. The text side uses the
+// same typed-string provider gdk_clipboard_set_text builds internally.
 gboolean clipboard_copy_owned(std::string const& value) {
   auto* clipboard = gdk_display_get_clipboard(gdk_display_get_default());
   GdkContentProvider* text =
-      gdk_content_provider_new_for_string("text/plain;charset=utf-8",
-                                          value.c_str());
+      gdk_content_provider_new_typed(G_TYPE_STRING, value.c_str());
   GBytes* empty = g_bytes_new(nullptr, 0);
   GdkContentProvider* marker =
       gdk_content_provider_new_for_bytes(kOwnedCopyMime, empty);
