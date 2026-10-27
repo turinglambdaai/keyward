@@ -9,6 +9,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -67,7 +68,6 @@ struct AppState {
 
   std::unique_ptr<rivet::linux_runtime::Backend> backend;
   std::unique_ptr<rivet_app::API> api;
-  std::unique_ptr<rivet::system::Clipboard> clipboard;
   std::mutex startup_mutex;
   std::thread startup_thread;
   std::unique_ptr<rivet::linux_runtime::Backend> startup_backend;
@@ -82,6 +82,16 @@ struct AppState {
   std::vector<EntryRow> entries;
   std::vector<SnapshotRow> snapshots;
   std::string selected;
+  // Bumped on every selection change; async entry/copy completions carry
+  // the generation they were issued under and are dropped when stale, so
+  // rows and copy targets always bind to the product on screen (issue #3).
+  unsigned selection_generation{0};
+  // GLib source id of the pending 30 s clipboard expiry (0 = none). A new
+  // copy cancels and reschedules it; the tick clears the clipboard only
+  // when it still holds our copy (checked through an ownership-marker mime,
+  // never by reading the value back), so a later unrelated copy by the
+  // user is never erased.
+  guint clipboard_expiry_source{0};
   GSimpleAction* deep_check_action{nullptr};
   GSimpleAction* snapshots_action{nullptr};
   // Rows refresher of the open snapshots dialog (null when closed).
@@ -246,6 +256,91 @@ void set_status(std::string const& text) {
   }
 }
 
+// Purpose hints for the family's known entry names (issue #2): every name
+// is load-bearing, so the app itself answers "what consumes this?" before
+// anyone guesses at deleting it. Unknown names get an explicit confirm
+// line instead of silence.
+char const* entry_purpose_hint(std::string const& name) {
+  if (name == "UPDATE_ED25519_PRIVATE_KEY_B64") {
+    return "Consumed by the release workflow (CI manifest signing)";
+  }
+  if (name == "UPDATE_ED25519_PUBLIC_KEY_SPKI_B64") {
+    return "Pasted into the Racket-side updater (SPKI form)";
+  }
+  if (name == "UPDATE_ED25519_PUBLIC_KEY_RAW_TAIL32_B64") {
+    return "Pasted into the macOS Swift host UpdateService (raw 32-byte form)";
+  }
+  if (name == "RIVET_UPDATE_KEY_ID") {
+    return "Written into the signed update manifest";
+  }
+  auto const ends_with = [&name](char const* suffix) {
+    size_t const len = std::strlen(suffix);
+    return name.size() >= len &&
+           name.compare(name.size() - len, len, suffix) == 0;
+  };
+  auto const starts_with = [&name](char const* prefix) {
+    return name.rfind(prefix, 0) == 0;
+  };
+  if (ends_with("_FPR")) {
+    return "Pairing anchor for Deep Check";
+  }
+  if (starts_with("LICENSE_") || starts_with("PERMIT_")) {
+    return "Commercial signing — different lifecycle from update keys";
+  }
+  return "No known consumer — confirm what reads it before deleting";
+}
+
+// Ownership-marker mime for the clipboard expiry: it rides along with the
+// copied text and disappears the moment anything else claims the clipboard,
+// so the expiry tick can recognize "still ours" without reading the value
+// back. The marker carries no secret.
+constexpr char kOwnedCopyMime[] = "application/x-keyward-owned-copy";
+
+// Copy with the ownership marker. Returns TRUE when the local claim was
+// taken; the caller schedules the expiry only then.
+gboolean clipboard_copy_owned(std::string const& value) {
+  auto* clipboard = gdk_display_get_clipboard(gdk_display_get_default());
+  GdkContentProvider* text =
+      gdk_content_provider_new_for_string("text/plain;charset=utf-8",
+                                          value.c_str());
+  GBytes* empty = g_bytes_new(nullptr, 0);
+  GdkContentProvider* marker =
+      gdk_content_provider_new_for_bytes(kOwnedCopyMime, empty);
+  g_bytes_unref(empty);
+  GdkContentProvider* parts[] = {text, marker};
+  GdkContentProvider* union_provider = gdk_content_provider_new_union(
+      parts, sizeof(parts) / sizeof(parts[0]));
+  g_object_unref(text);
+  g_object_unref(marker);
+  gboolean const ok =
+      gdk_clipboard_set_content(clipboard, union_provider);
+  g_object_unref(union_provider);
+  return ok;
+}
+
+gboolean clipboard_expiry_tick(gpointer) {
+  g_state.clipboard_expiry_source = 0;
+  auto* clipboard = gdk_display_get_clipboard(gdk_display_get_default());
+  GdkContentFormats const* formats =
+      gdk_clipboard_get_formats(clipboard);
+  if (formats != nullptr &&
+      gdk_content_formats_contain_mime_type(formats, kOwnedCopyMime)) {
+    // Still ours: empty the clipboard. Anything the user copied since has
+    // replaced the content and carries no marker, so it survives.
+    gdk_clipboard_set_content(clipboard, nullptr);
+    set_status("Auto-cleared the copied key from the clipboard");
+  }
+  return G_SOURCE_REMOVE;
+}
+
+void schedule_clipboard_expiry() {
+  if (g_state.clipboard_expiry_source != 0) {
+    g_source_remove(g_state.clipboard_expiry_source);
+  }
+  g_state.clipboard_expiry_source =
+      g_timeout_add_seconds(30, clipboard_expiry_tick, nullptr);
+}
+
 void refresh_store_path_label() {
   if (g_state.store_path != nullptr) {
     gtk_label_set_text(g_state.store_path,
@@ -366,6 +461,13 @@ void rebuild_detail() {
         "INI format works. The choice is remembered across launches.",
         "kw-dim");
     gtk_label_set_justify(GTK_LABEL(body), GTK_JUSTIFY_CENTER);
+    auto* custody = make_label(
+        "The file and its snapshots stay plain text on disk —\n"
+        "Keyward is not OS-encrypted custody. Keep the synced folder "
+        "trusted.",
+        "kw-dim");
+    gtk_widget_add_css_class(custody, "kw-caption");
+    gtk_label_set_justify(GTK_LABEL(custody), GTK_JUSTIFY_CENTER);
     auto* pick = gtk_button_new_with_label("Choose Vault…");
     gtk_widget_add_css_class(pick, "suggested-action");
     g_signal_connect(
@@ -375,6 +477,7 @@ void rebuild_detail() {
     gtk_box_append(GTK_BOX(pane), glyph);
     gtk_box_append(GTK_BOX(pane), title);
     gtk_box_append(GTK_BOX(pane), body);
+    gtk_box_append(GTK_BOX(pane), custody);
     gtk_box_append(GTK_BOX(pane), pick);
     gtk_box_append(g_state.detail, pane);
     return;
@@ -389,8 +492,10 @@ void rebuild_detail() {
     auto* title = make_label("A local vault for release-signing keys",
                              "kw-title");
     auto* body = make_label(
-        "Pick a product on the left. Values are never displayed —\n"
-        "they only ever leave through copy-to-clipboard.",
+        "Your keys live as plain text in one INI file that you control —\n"
+        "Keyward adds discipline, not encryption. Values are never\n"
+        "displayed: they leave only through copy-to-clipboard, and any\n"
+        "app can read the clipboard.",
         "kw-dim");
     gtk_label_set_justify(GTK_LABEL(body), GTK_JUSTIFY_CENTER);
     gtk_box_append(GTK_BOX(pane), glyph);
@@ -496,13 +601,20 @@ void rebuild_detail() {
     gtk_widget_set_valign(lock, GTK_ALIGN_CENTER);
     gtk_box_append(GTK_BOX(row), lock);
 
+    auto* names = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
     auto* name = gtk_label_new(entry.name.c_str());
     gtk_widget_add_css_class(name, "kw-mono");
     gtk_label_set_ellipsize(GTK_LABEL(name), PANGO_ELLIPSIZE_END);
     gtk_label_set_xalign(GTK_LABEL(name), 0.0f);
-    gtk_widget_set_hexpand(name, TRUE);
-    gtk_widget_set_valign(name, GTK_ALIGN_CENTER);
-    gtk_box_append(GTK_BOX(row), name);
+    gtk_widget_set_hexpand(names, TRUE);
+    gtk_box_append(GTK_BOX(names), name);
+    auto* hint = make_label(entry_purpose_hint(entry.name), "kw-dim");
+    gtk_widget_add_css_class(hint, "kw-caption");
+    gtk_label_set_ellipsize(GTK_LABEL(hint), PANGO_ELLIPSIZE_END);
+    gtk_label_set_xalign(GTK_LABEL(hint), 0.0f);
+    gtk_box_append(GTK_BOX(names), hint);
+    gtk_widget_set_valign(names, GTK_ALIGN_CENTER);
+    gtk_box_append(GTK_BOX(row), names);
 
     if (entry.state == "empty") {
       auto* badge = make_label("empty", "kw-empty-badge");
@@ -688,8 +800,11 @@ void show_delete_confirm(std::string const& name) {
   auto* dialog = gtk_message_dialog_new(
       GTK_WINDOW(g_state.window), GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION,
       GTK_BUTTONS_OK_CANCEL, "Delete %s?", name.c_str());
+  // The purpose line answers "can I delete this?" from the app itself
+  // (issue #2); the snapshot sentence keeps the recovery path visible.
   gtk_message_dialog_format_secondary_text(
-      GTK_MESSAGE_DIALOG(dialog),
+      GTK_MESSAGE_DIALOG(dialog), "%s\n%s",
+      entry_purpose_hint(name),
       "A snapshot is taken first and the old value stays recoverable from "
       "it.");
   g_signal_connect(
@@ -756,7 +871,8 @@ void show_snapshots_dialog() {
   gtk_widget_set_margin_end(content, 12);
   gtk_box_append(
       GTK_BOX(content),
-      make_label("Every write lands here first — restoring takes one click.",
+      make_label("Every write lands here first as a plain-text copy in "
+                 ".history/keyward — restoring takes one click.",
                  "kw-dim"));
 
   auto* rows = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
@@ -825,7 +941,8 @@ void show_about_dialog() {
                                rivet_app::kVersion);
   gtk_about_dialog_set_comments(
       GTK_ABOUT_DIALOG(dialog),
-      "A signing-key vault over your synced INI file — local by design.");
+      "A signing-key vault over your synced INI file — local by design.\n"
+      "The file and its snapshots are plain text, not encrypted custody.");
   gtk_about_dialog_set_license(GTK_ABOUT_DIALOG(dialog),
                                "Released under the GNU AGPL-3.0");
   // The GTK dialog carries a single website row (the taskly form); it
@@ -947,15 +1064,20 @@ void check_all() {
 
 void select_product(std::string const& name) {
   g_state.selected = name;
+  ++g_state.selection_generation;
+  auto const generation = g_state.selection_generation;
   g_state.entries.clear();
   rebuild_product_list();
   rebuild_detail();
   if (g_state.api == nullptr) return;
   (void)g_state.api->entry_list_async(
       name,
-      [](rivet_app::Result<std::vector<std::vector<std::string>>> result) {
+      [generation](rivet_app::Result<std::vector<std::vector<std::string>>> result) {
         on_result(std::move(result),
-                  [](std::vector<std::vector<std::string>> const& rows) {
+                  [generation](std::vector<std::vector<std::string>> const& rows) {
+                    // A stale entry list never overwrites the newer
+                    // selection.
+                    if (generation != g_state.selection_generation) return;
                     g_state.entries.clear();
                     for (auto const& row : rows) {
                       EntryRow entry;
@@ -970,16 +1092,35 @@ void select_product(std::string const& name) {
 
 void copy_entry(std::string const& name) {
   if (g_state.api == nullptr || g_state.selected.empty()) return;
+  auto const product = g_state.selected;
+  auto const generation = g_state.selection_generation;
   (void)g_state.api->entry_get_async(
-      g_state.selected, name,
-      [name](rivet_app::Result<std::string> result) {
-        on_result(std::move(result), [name](std::string const& value) {
-          // The value's only way out: clipboard, never the screen.
-          if (g_state.clipboard != nullptr) {
-            g_state.clipboard->write_text(value);
-          }
-          set_status("Copied " + name + " — value stays off-screen");
-        });
+      product, name,
+      [name, product, generation](rivet_app::Result<std::string> result) {
+        on_result(std::move(result),
+                  [name, product, generation](std::string const& value) {
+                    // The copy is bound to the product whose rows are on
+                    // screen; a selection change since the click drops it
+                    // instead of landing a secret against a different
+                    // header.
+                    if (product != g_state.selected ||
+                        generation != g_state.selection_generation) {
+                      set_status("Copy skipped — selection changed");
+                      return;
+                    }
+                    // The value's only way out: clipboard, never the
+                    // screen.
+                    if (clipboard_copy_owned(value)) {
+                      schedule_clipboard_expiry();
+                      set_status("Copied " + name +
+                                 " — raw value on the clipboard, other "
+                                 "apps can read it; auto-clears in 30 s "
+                                 "unless something else copies first");
+                    } else {
+                      set_status("Copy failed — the clipboard rejected "
+                                 "the content");
+                    }
+                  });
       });
 }
 
@@ -1078,6 +1219,9 @@ void open_store(std::string const& path) {
           refresh_store_path_label();
           g_state.products.clear();
           g_state.selected.clear();
+          // Invalidate entry/copy completions still in flight for the
+          // previous store's selection.
+          ++g_state.selection_generation;
           g_state.checks.clear();
           g_state.entries.clear();
           rebuild_product_list();
@@ -1278,9 +1422,8 @@ int on_backend_finished(gpointer) {
 
   g_state.backend = std::move(backend);
   g_state.api = std::make_unique<rivet_app::API>(*g_state.backend);
-  // Plain-text clipboard through the GTK display (rivet's adapter; compiled
-  // into this build per linux/CMakeLists.txt).
-  g_state.clipboard = std::make_unique<rivet::system::Clipboard>();
+  // Copies go straight through the GTK display clipboard (see
+  // clipboard_copy_owned); no rivet adapter state is needed here.
 
   // racket_boot installs Racket CS signal handlers. Install Rivet's process
   // shutdown bridge after the Hello handshake so SIGTERM/SIGINT keep reaching

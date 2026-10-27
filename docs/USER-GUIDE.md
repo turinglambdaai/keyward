@@ -26,11 +26,11 @@ The vault is a plaintext INI file; file permissions and snapshots do not encrypt
 
 ## Network, keys and privacy
 
-The vault engine has no network operations. Clipboard copies and any user-chosen folder sync create additional exposure. Keyward is not an HSM, OS keychain or protection from an already compromised user session.
+The vault engine has no network operations. Copy-to-clipboard is the only path a value takes out of the app: the status line says so at each copy, notes that any application can read the clipboard, and auto-clears Keyward's copy after 30 s — a later unrelated copy of your own is never erased. What the app cannot control (OS clipboard history or cross-device clipboard sync) stays disclosed as out of scope. Any user-chosen folder sync creates additional exposure. Keyward is not an HSM, OS keychain or protection from an already compromised user session.
 
 ## Known limits
 
-Multi-key validation was corrected in #4. Backup/restore, orphan detection, clipboard exposure and packaged release evidence still require the work tracked in #3; do not infer a security certification.
+Multi-key validation was corrected in #4. In-app disclosure of plaintext custody, per-entry purpose hints, copy-consequence messaging, selection-bound copies and the 30 s clipboard auto-clear have landed in source (#3); packaged three-platform release evidence for that slice is still pending. Backup/restore and rotation workflow work remains tracked in #3; do not infer a security certification.
 
 ## Updates and removal
 

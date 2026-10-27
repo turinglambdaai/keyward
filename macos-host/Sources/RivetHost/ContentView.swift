@@ -207,6 +207,29 @@ private struct ProductRowView: View {
 
 // ---- product pane ---------------------------------------------------------------
 
+// Purpose hints for the family's known entry names (issue #2): every name
+// is load-bearing, so the app itself answers "what consumes this?" before
+// anyone guesses at deleting it. Unknown names get an explicit confirm
+// line instead of silence.
+private func entryPurpose(_ name: String) -> String {
+    switch name {
+    case "UPDATE_ED25519_PRIVATE_KEY_B64":
+        return "Consumed by the release workflow (CI manifest signing)"
+    case "UPDATE_ED25519_PUBLIC_KEY_SPKI_B64":
+        return "Pasted into the Racket-side updater (SPKI form)"
+    case "UPDATE_ED25519_PUBLIC_KEY_RAW_TAIL32_B64":
+        return "Pasted into the macOS Swift host UpdateService (raw 32-byte form)"
+    case "RIVET_UPDATE_KEY_ID":
+        return "Written into the signed update manifest"
+    default:
+        if name.hasSuffix("_FPR") { return "Pairing anchor for Deep Check" }
+        if name.hasPrefix("LICENSE_") || name.hasPrefix("PERMIT_") {
+            return "Commercial signing — different lifecycle from update keys"
+        }
+        return "No known consumer — confirm what reads it before deleting"
+    }
+}
+
 private struct ProductPaneView: View {
     @EnvironmentObject private var model: KeywardModel
 
@@ -232,6 +255,10 @@ private struct ProductPaneView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(model.theme.secondaryText)
                 .multilineTextAlignment(.center)
+            Text("The file and its snapshots stay plain text on disk —\nKeyward is not OS-encrypted custody. Keep the synced folder trusted.")
+                .font(.system(size: 12))
+                .foregroundStyle(model.theme.tertiaryText)
+                .multilineTextAlignment(.center)
             Button("Choose Vault…") { model.requestOpenStore() }
                 .buttonStyle(.borderedProminent)
                 .tint(model.theme.accent)
@@ -251,7 +278,7 @@ private struct KeywardIntroPane: View {
             Text("A local vault for release-signing keys")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(model.theme.onSurface)
-            Text("Pick a product on the left. Values are never displayed —\nthey only ever leave through copy-to-clipboard.")
+            Text("Your keys live as plain text in one INI file that you control —\nKeyward adds discipline, not encryption. Values are never\ndisplayed: they leave only through copy-to-clipboard, and any\napp can read the clipboard.")
                 .font(.system(size: 13))
                 .foregroundStyle(model.theme.secondaryText)
                 .multilineTextAlignment(.center)
@@ -400,7 +427,7 @@ private struct ProductDetail: View {
             }
             ForEach(model.entries) { entry in
                 EntryCard(entry: entry,
-                          onCopy: { model.copyEntry(entry) },
+                          onCopy: { model.copyEntry(entry, in: product) },
                           onImport: {
                               importTarget = entry
                               showingImporter = true
@@ -434,7 +461,11 @@ private struct ProductDetail: View {
     }
     private var deleteTitle: String { "Delete \(deleteTarget?.name ?? "")?" }
     private var deleteMessage: String {
-        "A snapshot is taken first and the old value stays recoverable from it."
+        guard let name = deleteTarget?.name else {
+            return "A snapshot is taken first and the old value stays recoverable from it."
+        }
+        return "\(name): \(entryPurpose(name)). A snapshot is taken first "
+            + "and the old value stays recoverable from it."
     }
     private var deleteBinding: Binding<Bool> {
         Binding(get: { deleteTarget != nil },
@@ -514,10 +545,16 @@ private struct EntryCard: View {
                 .foregroundStyle(entry.state == "set"
                                  ? model.theme.accent
                                  : model.theme.tertiaryText)
-            Text(entry.name)
-                .font(.system(size: 13, design: .monospaced))
-                .foregroundStyle(model.theme.onSurface)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.name)
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(model.theme.onSurface)
+                    .lineLimit(1)
+                Text(entryPurpose(entry.name))
+                    .font(.system(size: 10))
+                    .foregroundStyle(model.theme.tertiaryText)
+                    .lineLimit(1)
+            }
             if entry.state == "empty" {
                 Text("empty")
                     .font(.system(size: 10, weight: .semibold))
@@ -600,7 +637,7 @@ private struct SnapshotsSheet: View {
                     Text("Store snapshots")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(model.theme.onSurface)
-                    Text("Every write lands here first — restoring takes one click.")
+                    Text("Every write lands here first as a plain-text copy in\n.history/keyward — restoring takes one click.")
                         .font(.system(size: 12))
                         .foregroundStyle(model.theme.secondaryText)
                 }
@@ -653,7 +690,7 @@ struct AboutSheet: View {
             Text("Keyward v\(version)")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(model.theme.onSurface)
-            Text("A signing-key vault over your synced INI file — local by design.")
+            Text("A signing-key vault over your synced INI file — local by design.\nThe file and its snapshots are plain text, not encrypted custody.")
                 .font(.system(size: 12))
                 .foregroundStyle(model.theme.secondaryText)
                 .multilineTextAlignment(.center)

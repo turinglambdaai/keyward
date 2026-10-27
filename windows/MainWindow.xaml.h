@@ -74,6 +74,7 @@ struct MainWindow : MainWindowT<MainWindow> {
   void CheckAll();
   void SelectProduct(std::wstring const& name);
   void CopyEntry(EntryRow const& entry);
+  void ScheduleClipboardExpiry();
   void SetEntry(std::wstring const& name, std::wstring const& value);
   void DeleteEntry(std::string const& name);
   void ImportKey(std::string const& name,
@@ -105,6 +106,16 @@ struct MainWindow : MainWindowT<MainWindow> {
   std::vector<SnapshotRow> snapshots_;
   std::wstring selected_;
   std::wstring store_path_;
+  // Bumped on every selection change; async entry/copy completions carry
+  // the generation they were issued under and are dropped when stale, so
+  // rows and copy targets always bind to the product on screen (issue #3).
+  unsigned selection_generation_{0};
+  // Owns the pending 30 s clipboard expiry. Restarted on every copy; the
+  // tick clears the clipboard only when it still holds our copy (checked
+  // through a non-secret marker property), so a later unrelated copy by
+  // the user is never erased.
+  winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer
+      clipboard_expiry_timer_{nullptr};
   // While the snapshots dialog is open, LoadSnapshots completions re-render
   // its rows through this (also fires on the first load, which lands after
   // the dialog is already up).
