@@ -795,7 +795,6 @@ void MainWindow::RestoreSnapshot(SnapshotRow const& snap) {
                     }
                   }
                 });
-                window->LoadSnapshots();
               }
             });
           } catch (std::exception const& e) {
