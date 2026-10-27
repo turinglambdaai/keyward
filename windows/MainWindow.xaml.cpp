@@ -8,6 +8,7 @@
 #include <shobjidl_core.h>
 
 #include <algorithm>
+#include <cstring>
 #include <cwctype>
 #include <stdexcept>
 
@@ -121,6 +122,40 @@ mx::Media::SolidColorBrush OverlayBrush() {
 
 mx::Media::SolidColorBrush DimBrush() {
   return mx::Media::SolidColorBrush({255, 128, 128, 128});
+}
+
+// Purpose hints for the family's known entry names (issue #2): every name
+// is load-bearing, so the app itself answers "what consumes this?" before
+// anyone guesses at deleting it. Unknown names get an explicit confirm
+// line instead of silence.
+std::wstring EntryPurposeHint(std::string const& name) {
+  if (name == "UPDATE_ED25519_PRIVATE_KEY_B64") {
+    return L"Consumed by the release workflow (CI manifest signing)";
+  }
+  if (name == "UPDATE_ED25519_PUBLIC_KEY_SPKI_B64") {
+    return L"Pasted into the Racket-side updater (SPKI form)";
+  }
+  if (name == "UPDATE_ED25519_PUBLIC_KEY_RAW_TAIL32_B64") {
+    return L"Pasted into the macOS Swift host UpdateService (raw 32-byte form)";
+  }
+  if (name == "RIVET_UPDATE_KEY_ID") {
+    return L"Written into the signed update manifest";
+  }
+  auto const starts_with = [&name](char const* prefix) {
+    return name.rfind(prefix, 0) == 0;
+  };
+  auto const ends_with = [&name](char const* suffix) {
+    auto const len = std::strlen(suffix);
+    return name.size() >= len &&
+           name.compare(name.size() - len, len, suffix) == 0;
+  };
+  if (ends_with("_FPR")) {
+    return L"Pairing anchor for Deep Check";
+  }
+  if (starts_with("LICENSE_") || starts_with("PERMIT_")) {
+    return L"Commercial signing — different lifecycle from update keys";
+  }
+  return L"No known consumer — confirm what reads it before deleting";
 }
 
 }  // namespace
@@ -365,6 +400,8 @@ void MainWindow::CheckAll() {
 
 void MainWindow::SelectProduct(std::wstring const& name) {
   selected_ = name;
+  ++selection_generation_;
+  auto const generation = selection_generation_;
   entries_.clear();
   RenderSidebar();
   RenderDetail();
@@ -379,12 +416,16 @@ void MainWindow::SelectProduct(std::wstring const& name) {
     rivet_app::API api(*backend);
     (void)api.entry_list_async(
         utf8_from_wide(name),
-        [dispatcher, weak](
+        [dispatcher, weak, generation](
             rivet_app::Result<std::vector<std::vector<std::string>>> result) {
           try {
             auto const rows = result.get();
-            dispatcher.TryEnqueue([weak, rows] {
+            dispatcher.TryEnqueue([weak, rows, generation] {
               if (auto window = weak.get()) {
+                // A stale entry list never overwrites the newer selection.
+                if (generation != window->selection_generation_) {
+                  return;
+                }
                 window->entries_.clear();
                 for (auto const& row : rows) {
                   EntryRow entry;
@@ -413,6 +454,8 @@ void MainWindow::CopyEntry(EntryRow const& entry) {
   if (selected_.empty()) {
     return;
   }
+  auto const product = selected_;
+  auto const generation = selection_generation_;
   auto const dispatcher = DispatcherQueue();
   auto const weak = get_weak();
   auto backend = backend_;
@@ -422,21 +465,45 @@ void MainWindow::CopyEntry(EntryRow const& entry) {
   try {
     rivet_app::API api(*backend);
     (void)api.entry_get_async(
-        utf8_from_wide(selected_), entry.name,
-        [dispatcher, weak, name = entry.name](
+        utf8_from_wide(product), entry.name,
+        [dispatcher, weak, name = entry.name, product, generation](
             rivet_app::Result<std::string> result) {
           try {
             auto const value = result.get();
-            dispatcher.TryEnqueue([weak, name, value] {
+            dispatcher.TryEnqueue([weak, name, value, product, generation] {
               if (auto window = weak.get()) {
+                // The copy is bound to the product whose rows are on
+                // screen; a selection change since the click drops it
+                // instead of landing a secret against a different header.
+                if (window->selected_ != product ||
+                    generation != window->selection_generation_) {
+                  window->SetStatusMessage(
+                      L"Copy skipped — selection changed");
+                  return;
+                }
                 // The value's only way out: clipboard, never the screen.
-                winrt::Windows::ApplicationModel::DataTransfer::DataPackage
-                    package;
-                package.SetText(winrt::to_hstring(value));
-                winrt::Windows::ApplicationModel::DataTransfer::Clipboard::
-                    SetContent(package);
-                window->SetStatusMessage(L"Copied " + wide(name) +
-                                         L" — value stays off-screen");
+                // The Title marks the copy as ours (the marker is not the
+                // secret) so the expiry tick can recognize it.
+                try {
+                  winrt::Windows::ApplicationModel::DataTransfer::DataPackage
+                      package;
+                  package.SetText(winrt::to_hstring(value));
+                  package.Properties().Title(L"Keyward copied secret");
+                  winrt::Windows::ApplicationModel::DataTransfer::Clipboard::
+                      SetContent(package);
+                } catch (...) {
+                  // A clipboard briefly locked by another process must not
+                  // crash the app; report and keep the value off-screen.
+                  window->SetStatusMessage(L"Copy failed — the clipboard "
+                                           L"rejected the content");
+                  return;
+                }
+                window->ScheduleClipboardExpiry();
+                window->SetStatusMessage(
+                    L"Copied " + wide(name) +
+                    L" — raw value on the clipboard, other apps can read "
+                    L"it; auto-clears in 30 s unless something else "
+                    L"copies first");
               }
             });
           } catch (std::exception const& e) {
@@ -451,6 +518,39 @@ void MainWindow::CopyEntry(EntryRow const& entry) {
   } catch (std::exception const& e) {
     ShowEngineMessage(e.what());
   }
+}
+
+// Optional expiry: erase the copied value 30 s later, but only while the
+// clipboard still holds what this action put there — recognized through
+// the marker Title, never by reading the value back. A user copy in
+// between replaces the content and survives untouched. OS clipboard
+// history/sync is out of our control and never claimed otherwise.
+void MainWindow::ScheduleClipboardExpiry() {
+  using winrt::Windows::ApplicationModel::DataTransfer::Clipboard;
+  if (clipboard_expiry_timer_ == nullptr) {
+    auto timer = DispatcherQueue().CreateTimer();
+    timer.IsRepeating(false);
+    timer.Tick([weak = get_weak()](auto const&, auto const&) {
+      if (auto window = weak.get()) {
+        try {
+          auto const view = Clipboard::GetContent();
+          if (view.Properties().Title() == L"Keyward copied secret") {
+            Clipboard::Clear();
+            window->SetStatusMessage(
+                L"Auto-cleared the copied key from the clipboard");
+          }
+        } catch (...) {
+          // A clipboard briefly locked by another process (winrt error or
+          // std exception) must never crash the expiry path; the value
+          // simply stays this round.
+        }
+      }
+    });
+    clipboard_expiry_timer_ = std::move(timer);
+  }
+  clipboard_expiry_timer_.Stop();
+  clipboard_expiry_timer_.Interval(std::chrono::seconds{30});
+  clipboard_expiry_timer_.Start();
 }
 
 void MainWindow::SetEntry(std::wstring const& name, std::wstring const& value) {
@@ -716,6 +816,9 @@ void MainWindow::OpenStoreAsync(std::wstring const& path) {
                     winrt::hstring(window->store_path_));
                 window->products_.clear();
                 window->selected_.clear();
+                // Invalidate entry/copy completions still in flight for
+                // the previous store's selection.
+                ++window->selection_generation_;
                 window->checks_.clear();
                 window->entries_.clear();
                 window->snapshots_.clear();
@@ -1083,12 +1186,24 @@ mx::UIElement MainWindow::MakeEntryCard(EntryRow const& entry) {
   lock.FontSize(12);
   lock.VerticalAlignment(mx::VerticalAlignment::Center);
 
+  mxc::StackPanel names;
+  names.Orientation(mx::Controls::Orientation::Vertical);
+  names.Spacing(1);
+  names.VerticalAlignment(mx::VerticalAlignment::Center);
+
   mxc::TextBlock name;
   name.Text(winrt::to_hstring(entry.name));
   name.FontSize(13);
   name.FontFamily(mx::Media::FontFamily(L"Consolas"));
-  name.VerticalAlignment(mx::VerticalAlignment::Center);
   name.TextTrimming(mx::TextTrimming::CharacterEllipsis);
+  names.Children().Append(name);
+
+  mxc::TextBlock hint;
+  hint.Text(EntryPurposeHint(entry.name));
+  hint.FontSize(10);
+  hint.Foreground(DimBrush());
+  hint.TextTrimming(mx::TextTrimming::CharacterEllipsis);
+  names.Children().Append(hint);
 
   mxc::StackPanel tail;
   tail.Orientation(mx::Controls::Orientation::Horizontal);
@@ -1147,11 +1262,11 @@ mx::UIElement MainWindow::MakeEntryCard(EntryRow const& entry) {
   more_button.Flyout(row_menu);
 
   mxc::Grid::SetColumn(lock, 0);
-  mxc::Grid::SetColumn(name, 1);
+  mxc::Grid::SetColumn(names, 1);
   mxc::Grid::SetColumn(tail, 2);
   mxc::Grid::SetColumn(more_button, 3);
   grid.Children().Append(lock);
-  grid.Children().Append(name);
+  grid.Children().Append(names);
   grid.Children().Append(tail);
   grid.Children().Append(more_button);
   card.Child(grid);
@@ -1196,8 +1311,11 @@ winrt::fire_and_forget MainWindow::NewEntryDialogAsync() {
 
 winrt::fire_and_forget MainWindow::ConfirmDeleteAsync(std::string name) {
   auto body = mxc::TextBlock{};
-  body.Text(L"A snapshot is taken first and the old value stays recoverable "
-            L"from it.");
+  // The purpose line answers "can I delete this?" from the app itself
+  // (issue #2); the snapshot sentence keeps the recovery path visible.
+  body.Text(EntryPurposeHint(name) +
+            L"\nA snapshot is taken first and the old value stays "
+            L"recoverable from it.");
   body.TextWrapping(mx::TextWrapping::Wrap);
   auto dialog = mxc::ContentDialog{};
   dialog.Title(winrt::box_value(L"Delete " + wide(name) + L"?"));
@@ -1306,7 +1424,9 @@ winrt::fire_and_forget MainWindow::SnapshotsDialogAsync() {
   auto panel = mxc::StackPanel{};
   panel.Spacing(8);
   auto caption = mxc::TextBlock{};
-  caption.Text(L"Every write lands here first — restoring takes one click.");
+  caption.Text(
+      L"Every write lands here first as a plain-text copy in "
+      L".history/keyward — restoring takes one click.");
   caption.FontSize(12);
   caption.Foreground(DimBrush());
   panel.Children().Append(caption);
@@ -1422,7 +1542,8 @@ winrt::fire_and_forget MainWindow::OnAbout(
   panel.Spacing(4);
   auto tagline = mxc::TextBlock{};
   tagline.Text(
-      L"A signing-key vault over your synced INI file — local by design.");
+      L"A signing-key vault over your synced INI file — local by design.\n"
+      L"The file and its snapshots are plain text, not encrypted custody.");
   tagline.TextAlignment(mx::TextAlignment::Center);
   tagline.Margin({0, 0, 0, 8});
   auto license = mxc::TextBlock{};

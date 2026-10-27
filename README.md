@@ -28,7 +28,9 @@ Rivet line — a Racket engine with native hosts — it keeps the vault file in
 your own synced folder and adds the discipline a plaintext store lacks:
 
 - **Never displayed, copy-only.** Key values are only ever returned by an
-  explicit copy-to-clipboard action.
+  explicit copy-to-clipboard action. The copy announces its own exposure
+  (any app can read the clipboard) and auto-clears after 30 s — unless
+  you have copied something else in between, which is never erased.
 - **Loss protection.** Every mutation snapshots the store first (append-only,
   inside the synced folder); writes are atomic and permissions are tightened.
 - **Deep check.** Parses each key (Ed25519 / RSA PKCS#8, base64-DER,

@@ -5,6 +5,34 @@ All notable changes to Keyward are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Per-entry purpose hints** (all three hosts): every known entry name now
+  carries a one-line consumer note — CI manifest signing, Racket-side
+  updater, macOS host `UpdateService`, update-manifest key id, Deep Check
+  pairing anchor, commercial-signing lifecycle. Unknown names get an
+  explicit "confirm what reads it before deleting" line, so the app itself
+  answers "can I delete this?" instead of silence. The delete confirmation
+  shows the same purpose line.
+- **Clipboard handling that tells the truth**: a copy reports that the raw
+  value is on the system clipboard where any app can read it, and auto-clears
+  after 30 s — only while the clipboard still holds Keyward's copy (change
+  count on macOS, a non-secret marker title on Windows, an ownership-marker
+  mime on Linux), so a later unrelated copy by the user is never erased.
+  Clipboard history/sync stays disclosed as out of Keyward's control.
+- **Plaintext custody stated in the app**: the intro, no-vault, snapshots
+  and About surfaces on all three hosts now say plainly that the vault file
+  and its snapshots are plain text on disk — not OS-encrypted custody — and
+  that the synced folder must be trusted.
+
+### Fixed
+
+- Rapidly selecting two products could leave rows and the copy target
+  bound to different sections: entry-list completions and copies are now
+  generation-guarded and bound to the product on screen; a stale copy is
+  skipped instead of landing a secret under a different header. A store
+  switch invalidates in-flight completions the same way.
+
 ### Fixed
 
 - Deep check now evaluates every private entry and all public anchors within its purpose. A valid update key no longer hides a corrupt or mismatched license key; multiple safe fingerprints remain labelled within the existing RPC row layout. Empty private entries are reported as unreadable. Regression coverage uses generated temporary keys only.

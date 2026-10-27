@@ -120,6 +120,12 @@ INI format works. The choice is remembered across launches."
                         FontSize="13"
                         TextAlignment="Center"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock
+                        Text="The file and its snapshots stay plain text on disk —
+Keyward is not OS-encrypted custody. Keep the synced folder trusted."
+                        FontSize="12"
+                        TextAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                     <Button
                         Content="Choose Vault…"
                         Style="{ThemeResource AccentButtonStyle}"
@@ -142,8 +148,10 @@ INI format works. The choice is remembered across launches."
                         FontWeight="SemiBold"
                         HorizontalAlignment="Center" />
                     <TextBlock
-                        Text="Pick a product on the left. Values are never displayed —
-they only ever leave through copy-to-clipboard."
+                        Text="Your keys live as plain text in one INI file that you control —
+Keyward adds discipline, not encryption. Values are never displayed:
+they leave only through copy-to-clipboard, and any app can read the
+clipboard."
                         FontSize="13"
                         TextAlignment="Center"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />

@@ -137,6 +137,17 @@ final class KeywardModel: ObservableObject {
         products.filter { $0.status != "ok" && $0.status != "no-key" && $0.status != "empty-section" }.count
     }
 
+    /// Bumped on every selection change. Async entry/copy completions carry
+    /// the generation they were issued under and are dropped when it no
+    /// longer matches — rows and copy targets always bind to the product on
+    /// screen, never to a stale selection (issue #3).
+    private var selectionGeneration = 0
+    /// changeCount captured right after our copy; the expiry timer clears
+    /// the pasteboard only while this is still the current count, so a
+    /// later unrelated copy by the user is never erased.
+    private var clipboardCopyChangeCount = 0
+    private var clipboardExpiryWork: DispatchWorkItem?
+
     private var backend: EmbeddedRacketBackend?
 
     init() {
@@ -259,18 +270,49 @@ final class KeywardModel: ObservableObject {
 
     func select(_ product: ProductInfo) {
         selected = product
+        selectionGeneration += 1
+        let generation = selectionGeneration
         call("entry-list") { try await $0.entry_list(product: product.name) } then: { rows in
+            guard generation == self.selectionGeneration else { return }
             self.entries = rows.map { EntryRow(name: $0[0], state: $0[1]) }
         }
     }
 
-    func copyEntry(_ entry: EntryRow) {
-        guard let product = selected else { return }
+    /// Copy is bound to the product whose rows are on screen. If the user
+    /// has since selected another product, the result is dropped instead of
+    /// landing a secret on the clipboard against a different header.
+    func copyEntry(_ entry: EntryRow, in product: ProductInfo) {
+        let generation = selectionGeneration
         call("entry-get") { try await $0.entry_get(product: product.name, name: entry.name) } then: { value in
+            guard product.name == self.selected?.name,
+                  generation == self.selectionGeneration else {
+                self.statusMessage = "Copy skipped — selection changed"
+                return
+            }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(value, forType: .string)
-            self.statusMessage = "Copied \(entry.name) — value stays off-screen"
+            self.scheduleClipboardExpiry()
+            self.statusMessage = "Copied \(entry.name) — raw value on the clipboard, "
+                + "other apps can read it; auto-clears in 30 s unless something else copies first"
         }
+    }
+
+    /// Optional expiry: erase the copied value 30 s later, but only while
+    /// the pasteboard still holds exactly what this action put there. A
+    /// user copy in between bumps changeCount and survives untouched. The
+    /// OS pasteboard history/sync is out of our control and never claimed
+    /// otherwise.
+    private func scheduleClipboardExpiry() {
+        clipboardExpiryWork?.cancel()
+        clipboardCopyChangeCount = NSPasteboard.general.changeCount
+        let work = DispatchWorkItem { [weak self] in
+            guard let self,
+                  NSPasteboard.general.changeCount == self.clipboardCopyChangeCount else { return }
+            NSPasteboard.general.clearContents()
+            self.statusMessage = "Auto-cleared the copied key from the clipboard"
+        }
+        clipboardExpiryWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: work)
     }
 
     func setEntry(name: String, value: String) {
@@ -326,6 +368,9 @@ final class KeywardModel: ObservableObject {
             self.storePath = path
             self.products = []
             self.selected = nil
+            // Invalidate entry/copy completions still in flight for the
+            // previous store's selection.
+            self.selectionGeneration += 1
             self.checks = []
             self.entries = []
             self.refreshProducts()
