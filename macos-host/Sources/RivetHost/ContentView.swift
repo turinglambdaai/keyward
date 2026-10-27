@@ -78,7 +78,8 @@ private struct SidebarView: View {
             SummaryTile(icon: "exclamationmark.triangle.fill", title: "Attention",
                         count: model.attentionCount, color: model.theme.warn, theme: model.theme)
             SummaryTile(icon: "clock.arrow.circlepath", title: "Snapshots",
-                        count: nil, color: model.theme.neutral, theme: model.theme)
+                        count: model.snapshots.count, color: model.theme.neutral,
+                        theme: model.theme)
         }
     }
 
@@ -321,17 +322,23 @@ private struct ProductDetail: View {
         .alert("New entry in \(product.name)", isPresented: $showingNewEntry) {
             TextField("NAME", text: $newEntryName)
             TextField("value (single line)", text: $newEntryValue)
+            // The engine rejects an empty name, so the button waits for one
+            // instead of sending a request that can only fail.
             Button("Set") {
                 model.setEntry(name: newEntryName.uppercased(), value: newEntryValue)
                 newEntryName = ""
                 newEntryValue = ""
             }
+            .disabled(newEntryName.trimmingCharacters(in: .whitespaces).isEmpty)
             Button("Cancel", role: .cancel) {}
         }
         .confirmationDialog(keyGenTitle, isPresented: $confirmingKeyGen,
                             titleVisibility: .visible) {
             Button("Generate", role: .destructive) { model.generateUpdateKey() }
+            // Return lands on Cancel, never on the destructive action —
+            // same safe default as the Windows and Linux confirm dialogs.
             Button("Cancel", role: .cancel) {}
+                .keyboardShortcut(.defaultAction)
         } message: {
             Text(keyGenMessage)
         }
@@ -341,7 +348,10 @@ private struct ProductDetail: View {
                 if let t = deleteTarget { model.deleteEntry(t) }
                 deleteTarget = nil
             }
-            Button("Cancel", role: .cancel) { deleteTarget = nil }
+            Button("Cancel", role: .cancel) {
+                deleteTarget = nil
+            }
+            .keyboardShortcut(.defaultAction)
         } message: {
             Text(deleteMessage)
         }

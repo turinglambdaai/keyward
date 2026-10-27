@@ -214,6 +214,7 @@ final class KeywardModel: ObservableObject {
         self.products = products
         ready = true
         status = "Connected — \(products.count) products"
+        loadSnapshots()
     }
 
     func bootstrapFailed(_ error: Error) {
@@ -251,6 +252,9 @@ final class KeywardModel: ObservableObject {
             if let sel = self.selected {
                 self.selected = self.products.first { $0.name == sel.name }
             }
+            // The sidebar Snapshots tile tracks every store mutation, the
+            // same way the Windows and Linux hosts refresh theirs.
+            self.loadSnapshots()
         }
     }
 
@@ -264,7 +268,9 @@ final class KeywardModel: ObservableObject {
                                 status: r.count > 7 ? r[7] : "")
             }
             self.refreshProducts()
-            self.statusMessage = "Deep check finished — \(rows.count) sections"
+            // Count product sections only — the "(file)" row is the
+            // whole-file report, not a section (Windows/Linux parity).
+            self.statusMessage = "Deep check finished — \(self.checks.count) sections"
         }
     }
 
@@ -320,6 +326,7 @@ final class KeywardModel: ObservableObject {
         call("entry-set") { try await $0.entry_set(product: product.name, name: name, value: value) } then: { result in
             self.statusMessage = "Set \(name) — \(result)"
             self.select(product)
+            self.loadSnapshots()
         }
     }
 
@@ -328,6 +335,7 @@ final class KeywardModel: ObservableObject {
         call("entry-delete") { try await $0.entry_delete(product: product.name, name: entry.name) } then: { _ in
             self.statusMessage = "Deleted \(entry.name) (snapshot taken)"
             self.select(product)
+            self.loadSnapshots()
         }
     }
 
@@ -339,6 +347,7 @@ final class KeywardModel: ObservableObject {
         } then: { result in
             self.statusMessage = "Imported \(name) — \(result)"
             self.select(product)
+            self.loadSnapshots()
         }
     }
 
@@ -347,6 +356,7 @@ final class KeywardModel: ObservableObject {
         call("keypair-generate") { try await $0.keypair_generate(product: product.name) } then: { row in
             self.statusMessage = "Generated \(row[0]) — fingerprint \(row[1]) (collected into the vault)"
             self.select(product)
+            self.loadSnapshots()
         }
     }
 
@@ -360,6 +370,11 @@ final class KeywardModel: ObservableObject {
         call("snapshot-restore") { try await $0.snapshot_restore(stamp: snap.stamp) } then: { _ in
             self.statusMessage = "Restored \(snap.stamp) (pre-restore snapshot taken)"
             self.refreshProducts()
+            // The restored file may hold different entries for the product
+            // still on screen — re-fetch them instead of trusting the
+            // pre-restore list.
+            if let product = self.selected { self.select(product) }
+            self.loadSnapshots()
         }
     }
 
