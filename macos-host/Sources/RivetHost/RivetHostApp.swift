@@ -369,12 +369,12 @@ final class KeywardModel: ObservableObject {
     func restoreSnapshot(_ snap: SnapshotRow) {
         call("snapshot-restore") { try await $0.snapshot_restore(stamp: snap.stamp) } then: { _ in
             self.statusMessage = "Restored \(snap.stamp) (pre-restore snapshot taken)"
+            // refreshProducts also refreshes the Snapshots tile count.
             self.refreshProducts()
             // The restored file may hold different entries for the product
             // still on screen — re-fetch them instead of trusting the
             // pre-restore list.
             if let product = self.selected { self.select(product) }
-            self.loadSnapshots()
         }
     }
 
