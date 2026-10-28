@@ -392,7 +392,8 @@ void rebuild_sidebar_summary() {
       [](ProductInfo const& p) { return status_is_warn(p.status); });
   auto text = "Products " + std::to_string(g_state.products.size()) +
               " · Paired " + std::to_string(paired) + " · Attention " +
-              std::to_string(attention);
+              std::to_string(attention) + " · Snapshots " +
+              std::to_string(g_state.snapshots.size());
   gtk_label_set_text(g_state.sidebar_summary, text.c_str());
 }
 
@@ -525,8 +526,24 @@ void rebuild_detail() {
   // ---- header card ----
   auto* header = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
   gtk_widget_add_css_class(header, "kw-card");
-  gtk_box_append(GTK_BOX(header),
-                 make_label(product.name.c_str(), "kw-title"));
+  auto* title_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  auto* title_label = make_label(product.name.c_str(), "kw-title");
+  gtk_widget_set_hexpand(title_label, TRUE);
+  gtk_widget_set_halign(title_label, GTK_ALIGN_START);
+  gtk_widget_set_valign(title_label, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(title_row), title_label);
+  // Header actions (macOS parity): Deep Check and Snapshots sit beside the
+  // product title, not only in the header menu.
+  auto* header_check = gtk_button_new_with_label("Deep Check");
+  gtk_actionable_set_action_name(GTK_ACTIONABLE(header_check), "win.deep-check");
+  gtk_widget_set_valign(header_check, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(title_row), header_check);
+  auto* header_snapshots = gtk_button_new_with_label("Snapshots");
+  gtk_actionable_set_action_name(GTK_ACTIONABLE(header_snapshots),
+                                 "win.snapshots");
+  gtk_widget_set_valign(header_snapshots, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(title_row), header_snapshots);
+  gtk_box_append(GTK_BOX(header), title_row);
 
   auto* info_chips = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_box_append(GTK_BOX(info_chips),
@@ -772,6 +789,21 @@ void show_new_entry_dialog() {
   g_object_set_data_full(G_OBJECT(dialog), "value-entry",
                          g_object_ref(value_entry), g_object_unref);
 
+  // The engine rejects an empty name, so Set waits for one (macOS/Windows
+  // parity); Enter lands on Set, Escape still cancels.
+  gtk_dialog_set_response_sensitive(GTK_DIALOG(dialog), GTK_RESPONSE_OK,
+                                    FALSE);
+  g_signal_connect(
+      name_entry, "changed",
+      G_CALLBACK(+[](GtkEditable* editable, gpointer user_data) {
+        auto* owner = GTK_DIALOG(user_data);
+        auto const* text = gtk_editable_get_text(editable);
+        gtk_dialog_set_response_sensitive(owner, GTK_RESPONSE_OK,
+                                          text != nullptr && *text != '\0');
+      }),
+      dialog);
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
+
   g_signal_connect(
       dialog, "response",
       G_CALLBACK(+[](GtkDialog* dialog, gint response, gpointer) {
@@ -807,6 +839,13 @@ void show_delete_confirm(std::string const& name) {
       entry_purpose_hint(name),
       "A snapshot is taken first and the old value stays recoverable from "
       "it.");
+  // Named buttons and a safe default: Return lands on Cancel, never on
+  // the destructive action (macOS/Windows parity).
+  if (auto* ok = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog),
+                                                    GTK_RESPONSE_OK)) {
+    gtk_button_set_label(GTK_BUTTON(ok), "_Delete");
+  }
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CANCEL);
   g_signal_connect(
       dialog, "response",
       G_CALLBACK(+[](GtkDialog* dialog, gint response, gpointer) {
@@ -836,6 +875,13 @@ void show_generate_confirm() {
       "The new pair is collected into the vault directly. Rotating the "
       "signing key is a release-level change — ship a build trusting the new "
       "public key first.");
+  // Named button and a safe default: Return lands on Cancel, never on the
+  // release-level action (macOS/Windows parity).
+  if (auto* ok = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog),
+                                                    GTK_RESPONSE_OK)) {
+    gtk_button_set_label(GTK_BUTTON(ok), "_Generate");
+  }
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CANCEL);
   g_signal_connect(
       dialog, "response",
       G_CALLBACK(+[](GtkDialog* dialog, gint response, gpointer) {
@@ -862,6 +908,7 @@ void show_snapshots_dialog() {
                                   GTK_DIALOG_USE_HEADER_BAR),
       "_Done", GTK_RESPONSE_CLOSE, nullptr);
   gtk_window_set_default_size(GTK_WINDOW(dialog), 560, 420);
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CLOSE);
 
   auto* content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
   gtk_box_set_spacing(GTK_BOX(content), 8);
@@ -1006,6 +1053,9 @@ void refresh_products(std::function<void()> then) {
                     }
                     rebuild_product_list();
                     rebuild_detail();
+                    // The sidebar Snapshots tile tracks every store
+                    // refresh (Windows parity).
+                    load_snapshots();
                     if (then) {
                       then();
                     }
@@ -1055,6 +1105,9 @@ void check_all() {
                       g_state.checks.push_back(std::move(check));
                     }
                     rebuild_detail();
+                    // Product statuses move after a check (macOS parity):
+                    // refresh the sidebar dots and captions from store-info.
+                    refresh_products(nullptr);
                     set_status("Deep check finished — " +
                                std::to_string(g_state.checks.size()) +
                                " sections");
@@ -1132,6 +1185,7 @@ void set_entry(std::string const& name, std::string const& value) {
         on_result(std::move(result), [name](std::string const& summary) {
           set_status("Set " + name + " — " + summary);
           select_product(g_state.selected);
+          load_snapshots();
         });
       });
 }
@@ -1144,6 +1198,7 @@ void delete_entry(std::string const& name) {
         on_result(std::move(result), [name](bool) {
           set_status("Deleted " + name + " (snapshot taken)");
           select_product(g_state.selected);
+          load_snapshots();
         });
       });
 }
@@ -1156,6 +1211,7 @@ void import_key(std::string const& name, std::string const& file_path) {
         on_result(std::move(result), [name](std::string const& summary) {
           set_status("Imported " + name + " — " + summary);
           select_product(g_state.selected);
+          load_snapshots();
         });
       });
 }
@@ -1173,6 +1229,7 @@ void generate_update_key() {
               set_status("Generated " + key_id + " — fingerprint " +
                          fingerprint + " (collected into the vault)");
               select_product(g_state.selected);
+              load_snapshots();
             });
       });
 }
@@ -1204,7 +1261,15 @@ void restore_snapshot(std::string const& stamp) {
       [stamp](rivet_app::Result<bool> result) {
         on_result(std::move(result), [stamp](bool) {
           set_status("Restored " + stamp + " (pre-restore snapshot taken)");
-          refresh_products(nullptr);
+          // The restored file may hold different entries for the product
+          // still on screen — refresh products, then re-fetch the
+          // selection's rows (macOS parity). refresh_products also
+          // refreshes the Snapshots tile count.
+          refresh_products([]() -> void {
+            if (!g_state.selected.empty()) {
+              select_product(g_state.selected);
+            }
+          });
         });
       });
 }
@@ -1532,8 +1597,23 @@ void on_activate(GtkApplication* app, gpointer) {
   gtk_box_append(GTK_BOX(sidebar), brand_box);
 
   g_state.sidebar_summary =
-      GTK_LABEL(make_label("Products 0 · Paired 0 · Attention 0", "kw-dim"));
+      GTK_LABEL(make_label("Products 0 · Paired 0 · Attention 0 · Snapshots 0",
+                           "kw-dim"));
   gtk_box_append(GTK_BOX(sidebar), GTK_WIDGET(g_state.sidebar_summary));
+
+  // Products section header with the deep-check affordance (macOS parity).
+  auto* products_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  auto* products_caption = make_label("Products", "kw-dim");
+  gtk_label_set_xalign(GTK_LABEL(products_caption), 0.0f);
+  gtk_widget_set_hexpand(products_caption, TRUE);
+  gtk_box_append(GTK_BOX(products_header), products_caption);
+  auto* sidebar_check = gtk_button_new_from_icon_name("emblem-ok-symbolic");
+  gtk_widget_set_tooltip_text(GTK_WIDGET(sidebar_check),
+                              "Deep Check (Ctrl+R)");
+  gtk_actionable_set_action_name(GTK_ACTIONABLE(sidebar_check),
+                                 "win.deep-check");
+  gtk_box_append(GTK_BOX(products_header), sidebar_check);
+  gtk_box_append(GTK_BOX(sidebar), products_header);
 
   g_state.product_list = GTK_LIST_BOX(gtk_list_box_new());
   gtk_list_box_set_selection_mode(g_state.product_list, GTK_SELECTION_SINGLE);
