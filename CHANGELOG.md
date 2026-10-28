@@ -5,6 +5,28 @@ All notable changes to Keyward are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Three-host interaction parity pass** (macOS / Windows / Linux):
+  - Deep Check refreshes the sidebar status dots and captions on Windows
+    and Linux immediately after the check, the way macOS already did.
+  - The Deep Check / Snapshots actions sit beside the product title on
+    every host, and the sidebar Products header carries a glyph
+    Deep Check button (Windows swapped its static accelerator hint for
+    it; Linux grew the header).
+  - The sidebar Snapshots count is live on all three hosts and refreshes
+    at bootstrap and after every mutation (set / delete / import /
+    generate / restore).
+  - Destructive confirmations (delete, key generation) put Return/Enter
+    on Cancel everywhere; the Linux dialogs name their buttons Delete /
+    Generate like the other hosts instead of OK.
+  - The New entry primary action waits for a non-empty NAME on all three
+    hosts instead of issuing a request the engine must reject.
+  - Restoring a snapshot re-fetches the selected product's entries — the
+    restored file may hold different rows than the pre-restore screen.
+  - Engine readiness always reaches the Windows InfoBar: the no-vault
+    state no longer sits on "Starting embedded Racket CS…" forever.
+
 ### Added
 
 - **Per-entry purpose hints** (all three hosts): every known entry name now
