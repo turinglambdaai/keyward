@@ -580,8 +580,17 @@ void MainWindow::SetEntry(std::wstring const& name, std::wstring const& value) {
               if (auto window = weak.get()) {
                 window->SetStatusMessage(L"Set " + wide(name) + L" — " +
                                          wide(summary));
-                window->SelectProduct(window->selected_);
-                window->LoadSnapshots();
+                // Counts and chips live in store-info: refresh products,
+                // then re-fetch the selection's rows, so the sidebar never
+                // shows stale numbers (macOS/Linux parity).
+                // RefreshProducts also refreshes the Snapshots tile.
+                window->RefreshProducts([weak]() -> void {
+                  if (auto current = weak.get()) {
+                    if (!current->selected_.empty()) {
+                      current->SelectProduct(current->selected_);
+                    }
+                  }
+                });
               }
             });
           } catch (std::exception const& e) {
@@ -619,9 +628,13 @@ void MainWindow::DeleteEntry(std::string const& name) {
               if (auto window = weak.get()) {
                 window->SetStatusMessage(L"Deleted " + wide(name) +
                                          L" (snapshot taken)");
-                window->SelectProduct(window->selected_);
-                // The delete took a snapshot; refresh the sidebar count.
-                window->LoadSnapshots();
+                window->RefreshProducts([weak]() -> void {
+                  if (auto current = weak.get()) {
+                    if (!current->selected_.empty()) {
+                      current->SelectProduct(current->selected_);
+                    }
+                  }
+                });
               }
             });
           } catch (std::exception const& e) {
@@ -660,8 +673,13 @@ void MainWindow::ImportKey(std::string const& name,
               if (auto window = weak.get()) {
                 window->SetStatusMessage(L"Imported " + wide(name) + L" — " +
                                          wide(summary));
-                window->SelectProduct(window->selected_);
-                window->LoadSnapshots();
+                window->RefreshProducts([weak]() -> void {
+                  if (auto current = weak.get()) {
+                    if (!current->selected_.empty()) {
+                      current->SelectProduct(current->selected_);
+                    }
+                  }
+                });
               }
             });
           } catch (std::exception const& e) {
@@ -703,8 +721,13 @@ void MainWindow::GenerateUpdateKey() {
                 window->SetStatusMessage(L"Generated " + key_id +
                                          L" — fingerprint " + fingerprint +
                                          L" (collected into the vault)");
-                window->SelectProduct(window->selected_);
-                window->LoadSnapshots();
+                window->RefreshProducts([weak]() -> void {
+                  if (auto current = weak.get()) {
+                    if (!current->selected_.empty()) {
+                      current->SelectProduct(current->selected_);
+                    }
+                  }
+                });
               }
             });
           } catch (std::exception const& e) {
