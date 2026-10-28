@@ -88,11 +88,21 @@
                             FontSize="13"
                             FontWeight="SemiBold"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock
-                            Text="Ctrl+R deep check"
-                            FontSize="11"
+                        <!-- macOS-parity deep-check affordance in the sidebar
+                             header; the glyph button replaces the static
+                             accelerator hint. -->
+                        <Button
+                            Click="OnDeepCheck"
                             HorizontalAlignment="Right"
-                            Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                            Padding="6,2,6,2"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            ToolTipService.ToolTip="Deep Check (Ctrl+R)">
+                            <FontIcon
+                                FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                Glyph="&#xE73E;"
+                                FontSize="12" />
+                        </Button>
                     </Grid>
                     <StackPanel x:Name="ProductList" Spacing="4" />
                 </StackPanel>

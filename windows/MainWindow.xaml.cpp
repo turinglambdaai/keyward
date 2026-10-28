@@ -217,13 +217,14 @@ winrt::fire_and_forget MainWindow::InitializeBackendAsync() {
 
 void MainWindow::SetReadyUi() {
   ready_ = true;
+  // Readiness is a fact about the engine, not about whether a vault is
+  // armed: the no-vault state still reports success (macOS/Linux parity),
+  // only the menu items wait for a store.
+  StatusBar().Severity(mx::Controls::InfoBarSeverity::Success);
+  StatusBar().Message(L"Embedded Racket CS is ready");
   auto const armed = !store_path_.empty();
   DeepCheckItem().IsEnabled(armed);
   SnapshotsItem().IsEnabled(armed);
-  if (armed) {
-    StatusBar().Severity(mx::Controls::InfoBarSeverity::Success);
-    StatusBar().Message(L"Embedded Racket CS is ready");
-  }
 }
 
 void MainWindow::SetErrorUi(std::string const& message) {
@@ -379,6 +380,9 @@ void MainWindow::CheckAll() {
                   window->checks_.push_back(std::move(check));
                 }
                 window->RenderDetail();
+                // Product statuses move after a check (macOS parity):
+                // refresh the sidebar dots and captions from store-info.
+                window->RefreshProducts(nullptr);
                 window->SetStatusMessage(
                     L"Deep check finished — " +
                     std::to_wstring(window->checks_.size()) + L" sections");
@@ -577,6 +581,7 @@ void MainWindow::SetEntry(std::wstring const& name, std::wstring const& value) {
                 window->SetStatusMessage(L"Set " + wide(name) + L" — " +
                                          wide(summary));
                 window->SelectProduct(window->selected_);
+                window->LoadSnapshots();
               }
             });
           } catch (std::exception const& e) {
@@ -656,6 +661,7 @@ void MainWindow::ImportKey(std::string const& name,
                 window->SetStatusMessage(L"Imported " + wide(name) + L" — " +
                                          wide(summary));
                 window->SelectProduct(window->selected_);
+                window->LoadSnapshots();
               }
             });
           } catch (std::exception const& e) {
@@ -698,6 +704,7 @@ void MainWindow::GenerateUpdateKey() {
                                          L" — fingerprint " + fingerprint +
                                          L" (collected into the vault)");
                 window->SelectProduct(window->selected_);
+                window->LoadSnapshots();
               }
             });
           } catch (std::exception const& e) {
@@ -778,7 +785,16 @@ void MainWindow::RestoreSnapshot(SnapshotRow const& snap) {
               if (auto window = weak.get()) {
                 window->SetStatusMessage(L"Restored " + wide(stamp) +
                                          L" (pre-restore snapshot taken)");
-                window->RefreshProducts(nullptr);
+                // The restored file may hold different entries for the
+                // product still on screen — refresh products, then re-fetch
+                // the selection's rows (macOS parity).
+                window->RefreshProducts([weak]() -> void {
+                  if (auto current = weak.get()) {
+                    if (!current->selected_.empty()) {
+                      current->SelectProduct(current->selected_);
+                    }
+                  }
+                });
               }
             });
           } catch (std::exception const& e) {
@@ -1048,12 +1064,54 @@ void MainWindow::RenderDetail() {
   mxc::StackPanel header_stack;
   header_stack.Spacing(10);
 
+  mxc::Grid title_row;
+  title_row.ColumnSpacing(8);
+  title_row.ColumnDefinitions().Append(mxc::ColumnDefinition{});
+  title_row.ColumnDefinitions().Append(mxc::ColumnDefinition{});
+  title_row.ColumnDefinitions().GetAt(0).Width(
+      mx::GridLength{1, mx::GridUnitType::Star});
+  title_row.ColumnDefinitions().GetAt(1).Width(
+      mx::GridLength{0, mx::GridUnitType::Auto});
+
   mxc::TextBlock title;
   title.Text(winrt::hstring(product.name));
   title.FontSize(22);
   title.FontWeight(FontBold());
   title.TextWrapping(mx::TextWrapping::Wrap);
-  header_stack.Children().Append(title);
+  title.VerticalAlignment(mx::VerticalAlignment::Center);
+  mxc::Grid::SetColumn(title, 0);
+  title_row.Children().Append(title);
+
+  // Header actions (macOS parity): Deep Check and Snapshots sit beside the
+  // product title, not only in the menu bar.
+  auto const header_weak = get_weak();
+  mxc::StackPanel header_actions;
+  header_actions.Orientation(mx::Controls::Orientation::Horizontal);
+  header_actions.Spacing(8);
+  header_actions.VerticalAlignment(mx::VerticalAlignment::Center);
+  mxc::Button header_check;
+  header_check.Content(winrt::box_value(L"Deep Check"));
+  header_check.FontSize(12);
+  header_check.Padding({10, 4, 10, 4});
+  header_check.Click([header_weak](auto const&, auto const&) {
+    if (auto window = header_weak.get()) {
+      window->CheckAll();
+    }
+  });
+  header_actions.Children().Append(header_check);
+  mxc::Button header_snapshots;
+  header_snapshots.Content(winrt::box_value(L"Snapshots"));
+  header_snapshots.FontSize(12);
+  header_snapshots.Padding({10, 4, 10, 4});
+  header_snapshots.Click([header_weak](auto const&, auto const&) {
+    if (auto window = header_weak.get()) {
+      window->SnapshotsDialogAsync();
+    }
+  });
+  header_actions.Children().Append(header_snapshots);
+  mxc::Grid::SetColumn(header_actions, 1);
+  title_row.Children().Append(header_actions);
+  header_stack.Children().Append(title_row);
 
   mxc::StackPanel info_chips;
   info_chips.Orientation(mx::Controls::Orientation::Horizontal);
@@ -1296,8 +1354,24 @@ winrt::fire_and_forget MainWindow::NewEntryDialogAsync() {
   dialog.PrimaryButtonText(L"Set");
   dialog.CloseButtonText(L"Cancel");
   dialog.DefaultButton(mxc::ContentDialogButton::Primary);
+  // The engine rejects an empty name, so Set waits for one (macOS/Linux
+  // parity). Projected XAML types have no get_weak: the handler reaches
+  // the dialog through the window member (cleared on close), so nothing
+  // captures the dialog strongly and no ref cycle forms.
+  dialog.IsPrimaryButtonEnabled(false);
+  pending_entry_dialog_ = dialog;
+  name_box.TextChanged([weak = get_weak()](auto const& sender, auto const&) {
+    if (auto window = weak.get()) {
+      if (auto current = window->pending_entry_dialog_) {
+        auto box = sender.as<mxc::TextBox>();
+        current.IsPrimaryButtonEnabled(box != nullptr &&
+                                       !box.Text().empty());
+      }
+    }
+  });
   dialog.XamlRoot(Content().XamlRoot());
   auto const choice = co_await dialog.ShowAsync();
+  pending_entry_dialog_ = nullptr;
   if (choice != mxc::ContentDialogResult::Primary) {
     co_return;
   }

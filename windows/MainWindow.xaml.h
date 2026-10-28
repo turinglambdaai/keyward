@@ -120,6 +120,12 @@ struct MainWindow : MainWindowT<MainWindow> {
   // its rows through this (also fires on the first load, which lands after
   // the dialog is already up).
   std::shared_ptr<std::function<void()>> snapshot_refresher_;
+  // The open new-entry dialog, held only while it is on screen. Projected
+  // XAML types have no get_weak, so the TextChanged handler reaches the
+  // dialog through this member (cleared on close) instead of capturing it
+  // — a strong capture would cycle dialog → panel → name_box → dialog.
+  winrt::Microsoft::UI::Xaml::Controls::ContentDialog pending_entry_dialog_{
+      nullptr};
 };
 
 }  // namespace winrt::RivetHost::implementation
