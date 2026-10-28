@@ -47,13 +47,16 @@ AGPL-3.0 许可的免费发布基础设施工具，不接商业激活。 提供 
 
 ## 状态
 
-**v0.2.0 已发布**——三个桌面的安装包都在
+**v0.2.1 已发布**——三个桌面的安装包都在
 [Releases 页](https://github.com/turinglambdaai/keyward/releases/latest)：
 macOS（arm64 / x64，DMG + zip）、Windows（x64，MSI + zip）、
 Linux（x64 / arm64，deb + rpm + AppImage + tar.gz + zip），每个都带
 SHA-256 sidecar。Windows（WinUI 3）与 Linux（GTK4）宿主已构建并有
-CI 覆盖。路线图：轮换流程（generate-next → promote，按两阶段 runbook）、
-工作区流浪密钥扫描器、Sparkle/Tauri 密钥格式导入导出。
+CI 覆盖。0.2.1 修复了 v0.2.0 的重启楔死（选完 vault 不再卡死下一次
+启动），并把三端拉齐到同一套交互契约：状态刷新、对话框默认按钮、
+剪贴板告知完全一致。路线图：轮换流程（generate-next → promote，
+按两阶段 runbook）、工作区流浪密钥扫描器、Sparkle/Tauri 密钥格式
+导入导出。
 
 ## 安全模型
 

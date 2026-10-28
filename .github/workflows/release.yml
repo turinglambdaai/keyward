@@ -39,6 +39,11 @@ jobs:
         run: raco pkg install --auto --no-docs crypto 'https://github.com/turinglambdaai/rivet.git#${{ env.RIVET_PIN }}'
       - name: Version preflight (rivet.rktd == tag == CHANGELOG)
         run: bash scripts/check-release-version.sh "${{ github.ref_name }}"
+      # Release artifacts must never reuse compiled caches from another
+      # commit (the v0.2.0 deb shipped an older engine than its tag);
+      # clean forces the whole backend to recompile from this checkout.
+      - name: Clean-build gate (issue #7)
+        run: raco rivet clean
       # DMG (human installer) + portable zip + launch smoke, no update
       # feed: keyward is a key vault and does not update itself yet —
       # the release ships with plain SHA256SUMS for integrity.
@@ -86,6 +91,10 @@ jobs:
       - name: Version preflight (rivet.rktd == tag == CHANGELOG)
         shell: bash
         run: bash scripts/check-release-version.sh "${{ github.ref_name }}"
+      # Clean-build gate — see the macOS leg (issue #7).
+      - name: Clean-build gate (issue #7)
+        shell: pwsh
+        run: raco rivet clean
       # MSI (human installer) + portable zip + launch smoke, no update
       # feed: keyward is a key vault and does not update itself —
       # same decision as the macOS leg.
@@ -144,9 +153,13 @@ jobs:
           sudo apt-get install --yes \
             libgtk-4-dev libadwaita-1-dev libjson-glib-dev libsecret-1-dev \
             libglib2.0-dev cmake ninja-build pkg-config file \
-            rpm desktop-file-utils
+            rpm desktop-file-utils \
+            xvfb dbus-x11 at-spi2-core python3-pyatspi
       - name: Version preflight (rivet.rktd == tag == CHANGELOG)
         run: bash scripts/check-release-version.sh "${{ github.ref_name }}"
+      # Clean-build gate — see the macOS leg (issue #7).
+      - name: Clean-build gate (issue #7)
+        run: raco rivet clean
       # tar.gz (portable) + deb + rpm + AppImage + portable zip + SBOM,
       # launch smoke included. The AppImage carries its own GTK4 dependency
       # closure; APPIMAGE_EXTRACT_AND_RUN lets appimagetool run on the
@@ -155,6 +168,24 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: raco rivet release --without-updates --development
+      # Release acceptance (issue #7): open a synthetic disposable vault in
+      # the packaged host and assert — through the accessibility tree —
+      # that the sidebar lists its product; then relaunch with the vault
+      # restored from the persisted config (the v0.2.0 restart wedge).
+      - name: Release-acceptance smoke (synthetic vault, restart persistence)
+        run: |
+          set -euo pipefail
+          HOST="$(find dist -type f -name RivetHost | head -n1)"
+          if [ -z "$HOST" ]; then
+            TAR="$(find dist -name 'keyward-*-linux-*.tar.gz' | head -n1)"
+            test -n "$TAR" || { echo "no Linux bundle found in dist" >&2; exit 1; }
+            mkdir -p "$RUNNER_TEMP/acceptance-bundle"
+            tar -xzf "$TAR" -C "$RUNNER_TEMP/acceptance-bundle"
+            HOST="$(find "$RUNNER_TEMP/acceptance-bundle" -type f -name RivetHost | head -n1)"
+          fi
+          test -n "$HOST" || { echo "RivetHost binary not found" >&2; exit 1; }
+          chmod +x "$HOST"
+          dbus-run-session -- bash scripts/release-acceptance.sh "$HOST"
       - name: Family naming + checksums
         run: |
           set -euo pipefail

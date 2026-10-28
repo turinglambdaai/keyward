@@ -5,6 +5,20 @@ All notable changes to Keyward are documented here. Format follows
 
 ## [Unreleased]
 
+## 0.2.1 - 2026-10-28
+
+**If you are on v0.2.0:** choosing a vault there wedges the app on the
+next launch (a `path->string: contract violation` engine error over a
+frozen "Starting embedded Racket CS…" state). 0.2.1 fixes it — your
+existing `~/.keyward/config.json` works as-is and no manual step is
+needed. If you must stay on v0.2.0, delete `~/.keyward/config.json`
+once to return to the working first-launch state.
+
+The release pipeline now gates on clean builds and runs a release-
+acceptance smoke against a synthetic vault: the packaged host must list
+the vault's product in its sidebar on first launch and again after a
+restart that restores the vault from the persisted config (issue #7).
+
 ### Fixed
 
 - **Three-host interaction parity pass** (macOS / Windows / Linux):
