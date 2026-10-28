@@ -803,6 +803,33 @@ void show_new_entry_dialog() {
       }),
       dialog);
   gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
+  // GTK4 GtkEntry no longer forwards Enter to the dialog's default
+  // response; wire activation to Set explicitly so the keyboard path
+  // matches the macOS and Windows hosts (and an empty NAME still never
+  // submits).
+  g_signal_connect(
+      name_entry, "activate",
+      G_CALLBACK(+[](GtkEditable* editable, gpointer user_data) {
+        auto const* text = gtk_editable_get_text(editable);
+        if (text != nullptr && *text != '\0') {
+          gtk_dialog_response(GTK_DIALOG(user_data), GTK_RESPONSE_OK);
+        }
+      }),
+      dialog);
+  g_signal_connect(
+      value_entry, "activate",
+      G_CALLBACK(+[](GtkEditable*, gpointer user_data) {
+        auto* dialog = GTK_DIALOG(user_data);
+        auto* name_entry = GTK_EDITABLE(
+            g_object_get_data(G_OBJECT(dialog), "name-entry"));
+        auto const* text = name_entry == nullptr
+                               ? ""
+                               : gtk_editable_get_text(name_entry);
+        if (text != nullptr && *text != '\0') {
+          gtk_dialog_response(dialog, GTK_RESPONSE_OK);
+        }
+      }),
+      dialog);
 
   g_signal_connect(
       dialog, "response",
@@ -1184,8 +1211,14 @@ void set_entry(std::string const& name, std::string const& value) {
       [name](rivet_app::Result<std::string> result) {
         on_result(std::move(result), [name](std::string const& summary) {
           set_status("Set " + name + " — " + summary);
-          select_product(g_state.selected);
-          load_snapshots();
+          // Counts and chips live in store-info: refresh products, then
+          // re-fetch the selection's rows, so the sidebar never shows
+          // stale numbers. refresh_products also refreshes Snapshots.
+          refresh_products([]() -> void {
+            if (!g_state.selected.empty()) {
+              select_product(g_state.selected);
+            }
+          });
         });
       });
 }
@@ -1197,8 +1230,11 @@ void delete_entry(std::string const& name) {
       [name](rivet_app::Result<bool> result) {
         on_result(std::move(result), [name](bool) {
           set_status("Deleted " + name + " (snapshot taken)");
-          select_product(g_state.selected);
-          load_snapshots();
+          refresh_products([]() -> void {
+            if (!g_state.selected.empty()) {
+              select_product(g_state.selected);
+            }
+          });
         });
       });
 }
@@ -1210,8 +1246,11 @@ void import_key(std::string const& name, std::string const& file_path) {
       [name](rivet_app::Result<std::string> result) {
         on_result(std::move(result), [name](std::string const& summary) {
           set_status("Imported " + name + " — " + summary);
-          select_product(g_state.selected);
-          load_snapshots();
+          refresh_products([]() -> void {
+            if (!g_state.selected.empty()) {
+              select_product(g_state.selected);
+            }
+          });
         });
       });
 }
@@ -1228,8 +1267,11 @@ void generate_update_key() {
               auto const fingerprint = row.size() > 1 ? row[1] : "";
               set_status("Generated " + key_id + " — fingerprint " +
                          fingerprint + " (collected into the vault)");
-              select_product(g_state.selected);
-              load_snapshots();
+              refresh_products([]() -> void {
+                if (!g_state.selected.empty()) {
+                  select_product(g_state.selected);
+                }
+              });
             });
       });
 }
@@ -1250,6 +1292,10 @@ void load_snapshots() {
                     if (g_state.snapshot_refresher != nullptr) {
                       (*g_state.snapshot_refresher)();
                     }
+                    // The sidebar summary carries the Snapshots count;
+                    // a bare reload (after a mutation, no product
+                    // refresh in flight) must still move it.
+                    rebuild_sidebar_summary();
                   });
       });
 }
