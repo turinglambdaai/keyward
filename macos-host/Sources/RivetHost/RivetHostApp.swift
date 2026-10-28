@@ -325,8 +325,12 @@ final class KeywardModel: ObservableObject {
         guard let product = selected else { return }
         call("entry-set") { try await $0.entry_set(product: product.name, name: name, value: value) } then: { result in
             self.statusMessage = "Set \(name) — \(result)"
+            // Counts and chips live in store-info: refresh products, then
+            // re-fetch the selection's rows, so the sidebar never shows
+            // stale numbers (Linux/Windows parity). refreshProducts also
+            // refreshes the Snapshots tile.
+            self.refreshProducts()
             self.select(product)
-            self.loadSnapshots()
         }
     }
 
@@ -334,8 +338,8 @@ final class KeywardModel: ObservableObject {
         guard let product = selected else { return }
         call("entry-delete") { try await $0.entry_delete(product: product.name, name: entry.name) } then: { _ in
             self.statusMessage = "Deleted \(entry.name) (snapshot taken)"
+            self.refreshProducts()
             self.select(product)
-            self.loadSnapshots()
         }
     }
 
@@ -346,8 +350,8 @@ final class KeywardModel: ObservableObject {
             try await $0.entry_import_file(product: product.name, name: name, file_path: path)
         } then: { result in
             self.statusMessage = "Imported \(name) — \(result)"
+            self.refreshProducts()
             self.select(product)
-            self.loadSnapshots()
         }
     }
 
@@ -355,8 +359,8 @@ final class KeywardModel: ObservableObject {
         guard let product = selected else { return }
         call("keypair-generate") { try await $0.keypair_generate(product: product.name) } then: { row in
             self.statusMessage = "Generated \(row[0]) — fingerprint \(row[1]) (collected into the vault)"
+            self.refreshProducts()
             self.select(product)
-            self.loadSnapshots()
         }
     }
 
