@@ -14,7 +14,7 @@ concurrency:
 # Single source of truth for the rivet pin; every install step below
 # references this so a bump is one edit, not a grep-replace across jobs.
 env:
-  RIVET_PIN: v0.11.0
+  RIVET_PIN: v0.13.0
 
 jobs:
   macos:
@@ -138,7 +138,7 @@ jobs:
       # The ref is a literal — `uses:` cannot expand ${{ env.RIVET_PIN }};
       # keep it in sync with RIVET_PIN above when bumping rivet.
       - name: Set up embeddable Racket CS
-        uses: turinglambdaai/rivet/.github/actions/setup-embed-racket@v0.11.0
+        uses: turinglambdaai/rivet/.github/actions/setup-embed-racket@v0.13.0
       # Installed after the embeddable runtime so the catalog dependency
       # closure (cext-lib, crypto-lib, keel) resolves against the minimal
       # build — it ships no packages of its own. crypto backs keyward's

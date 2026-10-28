@@ -5,6 +5,17 @@ All notable changes to Keyward are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Rivet pin `v0.11.0` → `v0.13.0` across CI and the release pipeline
+  (including the setup-embed-racket action ref), per the family rule
+  that release builds pin the latest released rivet while development
+  tracks main. The committed typed clients are regenerated with the
+  v0.13.0 code generator (it now emits bounded `_within` timeout
+  variants); `raco rivet schema check` reports the API baseline fully
+  compatible, and the macOS host builds clean against the regenerated
+  Swift client.
+
 ## 0.2.1 - 2026-10-28
 
 **If you are on v0.2.0:** choosing a vault there wedges the app on the
