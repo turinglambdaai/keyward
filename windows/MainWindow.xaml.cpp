@@ -1355,19 +1355,23 @@ winrt::fire_and_forget MainWindow::NewEntryDialogAsync() {
   dialog.CloseButtonText(L"Cancel");
   dialog.DefaultButton(mxc::ContentDialogButton::Primary);
   // The engine rejects an empty name, so Set waits for one (macOS/Linux
-  // parity). Both captures are weak: the handler lives on name_box, and a
-  // strong dialog capture would cycle dialog → panel → name_box → dialog.
+  // parity). Projected XAML types have no get_weak: the handler reaches
+  // the dialog through the window member (cleared on close), so nothing
+  // captures the dialog strongly and no ref cycle forms.
   dialog.IsPrimaryButtonEnabled(false);
-  auto dialog_weak = dialog.get_weak();
-  auto name_box_weak = name_box.get_weak();
-  name_box.TextChanged([dialog_weak, name_box_weak](auto const&, auto const&) {
-    auto box = name_box_weak.get();
-    if (auto current = dialog_weak.get()) {
-      current.IsPrimaryButtonEnabled(box != nullptr && !box.Text().empty());
+  pending_entry_dialog_ = dialog;
+  name_box.TextChanged([weak = get_weak()](auto const& sender, auto const&) {
+    if (auto window = weak.get()) {
+      if (auto current = window->pending_entry_dialog_) {
+        auto box = sender.as<mxc::TextBox>();
+        current.IsPrimaryButtonEnabled(box != nullptr &&
+                                       !box.Text().empty());
+      }
     }
   });
   dialog.XamlRoot(Content().XamlRoot());
   auto const choice = co_await dialog.ShowAsync();
+  pending_entry_dialog_ = nullptr;
   if (choice != mxc::ContentDialogResult::Primary) {
     co_return;
   }
