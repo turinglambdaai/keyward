@@ -16,12 +16,16 @@ All notable changes to Keyward are documented here. Format follows
     it; Linux grew the header).
   - The sidebar Snapshots count is live on all three hosts and refreshes
     at bootstrap and after every mutation (set / delete / import /
-    generate / restore).
+    generate / restore); every mutation also refreshes the product counts
+    and status chips through store-info, so no sidebar number waits for
+    the next Deep Check (found by the live Linux verification pass).
   - Destructive confirmations (delete, key generation) put Return/Enter
     on Cancel everywhere; the Linux dialogs name their buttons Delete /
     Generate like the other hosts instead of OK.
   - The New entry primary action waits for a non-empty NAME on all three
-    hosts instead of issuing a request the engine must reject.
+    hosts instead of issuing a request the engine must reject, and on
+    GTK4 the two fields now submit on Enter (activation no longer
+    reaches the dialog's default response there).
   - Restoring a snapshot re-fetches the selected product's entries — the
     restored file may hold different rows than the pre-restore screen.
   - Engine readiness always reaches the Windows InfoBar: the no-vault
