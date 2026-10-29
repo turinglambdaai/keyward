@@ -5,6 +5,37 @@ All notable changes to Keyward are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Two-phase rotation workflow (all three hosts).** Every product now
+  carries a Rotation card: *Stage Next Key* writes a fresh Ed25519 pair
+  under `UPDATE_ED25519_NEXT_*` entries while the active signing key keeps
+  releasing untouched (runbook phase 1 — embed the staged public anchors in
+  app source, ship a release signed with the old key); *Promote* moves the
+  staged values into the active names and retires the NEXT entries once the
+  staged pair passes pairing verification (phase 2 — then swap the CI
+  secret); *Discard* cancels a staging. The staged pair deep-checks green
+  through the existing purpose-anchor matching, purpose hints cover the
+  NEXT names, and Promote stays disabled until the staged pair is paired.
+- **Stray-key scanner (all three hosts).** Vault ▸ Scan Folder for Stray
+  Keys… walks a chosen working tree — bounded in depth, file count and file
+  size; vendored trees, the vault itself and its `.history` are excluded —
+  and reports private-key material found outside the vault as path / line /
+  kind / fingerprint rows. PEM private headers are caught anywhere in text
+  files, key-ish extensions are decoded (base64-DER, Sparkle
+  base64(seed+pub), binary DER), and values are never shown.
+- **Updater-native key import and export (all three hosts).** File import
+  now sniffs PEM, base64(DER), Sparkle private/public files and minisign
+  public/secret files, normalizing everything into the family forms. Every
+  entry gains a *Copy as…* menu — Sparkle private key and `SUPublicEDKey`,
+  minisign `.pub` plus the base64 `tauri.conf.json` pubkey form, an
+  unencrypted minisign secret key for `TAURI_SIGNING_PRIVATE_KEY`, and
+  PKCS#8/SPKI PEM — always clipboard-only with the same exposure
+  disclosure and 30 s auto-clear as a plain copy. The minisign keynum is
+  derived deterministically from the public key, so an exported `.pub` and
+  `.key` always agree; password-protected minisign secret keys are refused
+  with the remedy spelled out.
+
 ### Changed
 
 - Rivet pin `v0.11.0` → `v0.13.0` across CI and the release pipeline
@@ -15,6 +46,16 @@ All notable changes to Keyward are documented here. Format follows
   variants); `raco rivet schema check` reports the API baseline fully
   compatible, and the macOS host builds clean against the regenerated
   Swift client.
+
+### Fixed
+
+- **Choosing a vault now switches immediately.** Rivet runs every request
+  handler in a fresh thread, and the vault selection was a thread-local
+  parameter — `store-open`'s write lived and died inside one handler
+  thread while every later request kept seeing the startup default, so
+  the app silently served the previous vault until relaunch. The
+  selection is process state now. (Caught by a wire-level acceptance run
+  speaking RVT1 to a spawned backend.)
 
 ## 0.2.1 - 2026-10-28
 
