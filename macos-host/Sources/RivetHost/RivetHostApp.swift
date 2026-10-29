@@ -56,6 +56,8 @@ struct KeywardCommands: Commands {
             }
             .keyboardShortcut("l", modifiers: [.command])
             .disabled(!model.ready || model.storePath.isEmpty)
+            Button("Scan Folder for Stray Keys…") { model.strayScanRequested = true }
+                .disabled(!model.ready || model.storePath.isEmpty)
         }
     }
 }
@@ -112,6 +114,27 @@ struct SnapshotRow: Identifiable, Equatable {
     var id: String { stamp }
 }
 
+/// Rotation staging state for the selected product — identifiers and
+/// fingerprints only, straight from `rotation-status`.
+struct RotationState: Equatable {
+    let nextPresent: String
+    let nextPaired: String
+    let nextFingerprint: String
+    let nextKeyID: String
+    let activeFingerprint: String
+    let activeKeyID: String
+}
+
+/// One stray-key scan hit: relative path, 1-based line, kind label,
+/// fingerprint. Values never appear.
+struct StrayRow: Identifiable, Equatable {
+    let path: String
+    let line: String
+    let kind: String
+    let fingerprint: String
+    var id: String { path + "/" + kind }
+}
+
 @MainActor
 final class KeywardModel: ObservableObject {
     @Published var status = "Starting embedded Racket CS…"
@@ -127,6 +150,12 @@ final class KeywardModel: ObservableObject {
     @Published var snapshotsVisible = false
     @Published var aboutVisible = false
     @Published var openStoreRequested = false
+    @Published var strayScanRequested = false
+    @Published var strayScanVisible = false
+    @Published var strayRows: [StrayRow] = []
+    @Published var rotation = RotationState(nextPresent: "no", nextPaired: "-",
+                                            nextFingerprint: "-", nextKeyID: "-",
+                                            activeFingerprint: "-", activeKeyID: "-")
     @Published var isDark = false
 
     var theme: ThemeState { ThemeState(isDark: isDark) }
@@ -282,6 +311,85 @@ final class KeywardModel: ObservableObject {
             guard generation == self.selectionGeneration else { return }
             self.entries = rows.map { EntryRow(name: $0[0], state: $0[1]) }
         }
+        refreshRotation(for: product)
+    }
+
+    // ---- rotation (two-phase runbook) ------------------------------------------------
+
+    private func refreshRotation(for product: ProductInfo) {
+        call("rotation-status") { try await $0.rotation_status(product: product.name) } then: { row in
+            self.rotation = RotationState(nextPresent: row[0], nextPaired: row[1],
+                                          nextFingerprint: row[2], nextKeyID: row[3],
+                                          activeFingerprint: row[4], activeKeyID: row[5])
+        }
+    }
+
+    /// Phase 1: stage a NEXT pair under UPDATE_ED25519_NEXT_* — the active
+    /// signing key stays untouched, so CI keeps releasing with the old key.
+    func stageNextKey() {
+        guard let product = selected else { return }
+        call("rotation-start") { try await $0.rotation_start(product: product.name) } then: { row in
+            self.statusMessage = "Staged next key \(row[0]) — fingerprint \(row[1]). "
+                + "Embed its public anchors in app source and ship a phase-1 release before promoting."
+            self.refreshProducts()
+            self.select(product)
+        }
+    }
+
+    /// Phase 2: the staged pair becomes the signing key — swap the CI
+    /// secret to the new private key afterwards.
+    func promoteNextKey() {
+        guard let product = selected else { return }
+        call("rotation-promote") { try await $0.rotation_promote(product: product.name) } then: { row in
+            self.statusMessage = "Promoted \(row[0]) — fingerprint \(row[1]). "
+                + "Now swap the CI secret to the new private key; releases sign with the new key from here."
+            self.refreshProducts()
+            self.select(product)
+        }
+    }
+
+    func discardNextKey() {
+        guard let product = selected else { return }
+        call("rotation-cancel") { try await $0.rotation_cancel(product: product.name) } then: { _ in
+            self.statusMessage = "Discarded the staged next key (snapshot taken)."
+            self.refreshProducts()
+            self.select(product)
+        }
+    }
+
+    // ---- stray-key scan ----------------------------------------------------------------
+
+    func runStrayScan(at url: URL) {
+        call("stray-scan-tree") { try await $0.stray_scan_tree(dir: url.path) } then: { rows in
+            self.strayRows = rows.map {
+                StrayRow(path: $0[0], line: $0.count > 1 ? $0[1] : "",
+                         kind: $0.count > 2 ? $0[2] : "",
+                         fingerprint: $0.count > 3 ? $0[3] : "")
+            }
+            self.strayScanVisible = true
+            self.statusMessage = "Stray-key scan finished — \(self.strayRows.count) hits"
+        }
+    }
+
+    /// Export a vault entry in an updater-native format; the value goes to
+    /// the clipboard with the same disclosure as a plain copy.
+    func copyExport(entry: EntryRow, format: String) {
+        guard let product = selected else { return }
+        let generation = selectionGeneration
+        call("keypair-export") {
+            try await $0.keypair_export(product: product.name, name: entry.name, format: format)
+        } then: { value in
+            guard product.name == self.selected?.name,
+                  generation == self.selectionGeneration else {
+                self.statusMessage = "Copy skipped — selection changed"
+                return
+            }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(value, forType: .string)
+            self.scheduleClipboardExpiry()
+            self.statusMessage = "Copied \(entry.name) as \(format) — raw value on the clipboard, "
+                + "other apps can read it; auto-clears in 30 s unless something else copies first"
+        }
     }
 
     /// Copy is bound to the product whose rows are on screen. If the user
@@ -392,6 +500,9 @@ final class KeywardModel: ObservableObject {
             self.selectionGeneration += 1
             self.checks = []
             self.entries = []
+            self.rotation = RotationState(nextPresent: "no", nextPaired: "-",
+                                          nextFingerprint: "-", nextKeyID: "-",
+                                          activeFingerprint: "-", activeKeyID: "-")
             self.refreshProducts()
             self.statusMessage = "Store switched: \(path)"
         }
