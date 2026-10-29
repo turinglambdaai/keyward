@@ -65,7 +65,7 @@
 
 ;; the PEM hit reports its 1-based line and kind label
 (define pem-row (car (filter (lambda (r) (string=? (car r) "notes/readme.md")) rows)))
-(check-equal? (cadr pem-row) 3)
+(check-equal? (cadr pem-row) "3")
 (check-true (string-prefix? (list-ref pem-row 2) "pem-private("))
 (check-equal? (list-ref pem-row 3) expected-fp)
 
@@ -78,8 +78,10 @@
 (check-equal? (list-ref sparkle-row 2) "sparkle-style-private")
 (check-equal? (list-ref sparkle-row 3) expected-fp)
 
-;; rows never carry key material: every string field is short and safe
-(for* ([row (in-list rows)] [field (in-list row)] #:when (string? field))
+;; rows never carry key material: every field is short and safe — and the
+;; wire contract is (List (List String)), so every field must be a string
+(for* ([row (in-list rows)] [field (in-list row)])
+  (check-true (string? field))
   (check-true (< (string-length field) 120)))
 
 ;; the vault file itself and the snapshot history are excluded

@@ -125,7 +125,8 @@
     (and pos
          (let* ([start (car (car pos))]
                 [label (substring text (car (cadr pos)) (cdr (cadr pos)))]
-                [line (add1 (count-newlines text start))]
+                ;; wire rows are all-strings: the line number travels as text
+                [line (number->string (add1 (count-newlines text start)))]
                 ;; fingerprint the PEM block itself — a header line inside a
                 ;; larger document must not feed the whole file to the parser
                 [fp (key-fingerprint-or-dash (value->der (substring text start (cdr (car pos)))))])
@@ -144,7 +145,7 @@
   (cond
     [(and (>= (bytes-length bs) 2) (= (bytes-ref bs 0) 48))
      (define key (private-key-or-false bs))
-     (and key (list rel 0 "der-private" (public-fingerprint key)))]
+     (and key (list rel "0" "der-private" (public-fingerprint key)))]
     [else
      (define text (string-trim (bytes->string/latin-1 bs)))
      (cond
@@ -152,7 +153,7 @@
         (or (let ([der (value->der text)])
               (and der
                    (let ([key (private-key-from-der der)])
-                     (and key (list rel 0 "der-private" (public-fingerprint key))))))
+                     (and key (list rel "0" "der-private" (public-fingerprint key))))))
             (sparkle-hit text rel))]
        [else #f])]))
 
@@ -163,7 +164,7 @@
     (and d (= (bytes-length d) 64)
          (with-handlers ([exn:fail? (lambda (_) #f)])
            (define key (ed25519-from-seed-pub (subbytes d 0 32) (subbytes d 32 64)))
-           (list rel 0 "sparkle-style-private" (public-fingerprint key))))))
+           (list rel "0" "sparkle-style-private" (public-fingerprint key))))))
 
 (define (private-key-or-false der)
   (with-handlers ([exn:fail? (lambda (_) #f)])

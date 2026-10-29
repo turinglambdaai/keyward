@@ -31,7 +31,7 @@
 ;;                active-fingerprint active-key-id)
 
 (define p (make-vault!))
-(current-store (path->string p))
+(select-store! (path->string p))
 
 (define s0 (rotation-status "alpha"))
 (check-equal? (list-ref s0 0) "no")     ; next-present

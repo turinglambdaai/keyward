@@ -29,27 +29,34 @@
 
 (provide start
          ;; narrow test-facing surface: the rotation RPC bodies run as plain
-         ;; functions against `current-store`, so the runbook stays unit-
-         ;; testable without standing up the wire
-         current-store
+         ;; functions against the process-global selection, so the runbook
+         ;; stays unit-testable without standing up the wire
+         select-store!
          rotation-start rotation-status rotation-promote rotation-cancel)
 
-;; the active vault: a path string, or #f until the user picks one
-(define current-store
-  (make-parameter (store-path-default)))
+;; the active vault: a path string, or #f until the user picks one. This is
+;; PROCESS-global state in a plain box — rivet runs every request handler in
+;; a fresh thread, so a `make-parameter` write inside store-open would be
+;; invisible to every later handler (live vault switching silently kept
+;; serving the startup default until relaunch; the wire acceptance caught
+;; it). Box reads/writes are atomic; there is a single writer at a time.
+(define store-selection (box (store-path-default)))
+
+(define (select-store! path) (set-box! store-selection path))
+(define (selected-store) (unbox store-selection))
 
 (define (active-store)
-  (or (current-store)
+  (or (selected-store)
       (error 'keyward "no vault selected — choose a secrets.ini first")))
 
 ;; ---- store -----------------------------------------------------------------
 
 ;; the active store is kept as a plain string end to end: Racket 9.3's
 ;; path->string rejects strings outright ("contract violation expected:
-;; path?"), so a path object must never enter current-store
+;; path?"), so a path object must never enter the selection
 
 (define-rpc (store-path : String)
-  (define p (current-store))
+  (define p (selected-store))
   (cond [(string? p) p]
         [(path? p) (path->string p)]
         [else ""]))
@@ -58,7 +65,7 @@
   (define p (simple-form-path (string-trim path)))
   (unless (file-exists? p) (error 'store-open "no such store: ~a" p))
   (define ps (path->string p))
-  (current-store ps)
+  (select-store! ps)
   ;; remember the choice across launches — the config holds a path, never a
   ;; secret; the family path is only a fallback, never an assumption
   (config-set! "store" ps)
@@ -66,8 +73,8 @@
 
 ;; light listing: emptiness only, no crypto — cheap enough for the sidebar
 (define-rpc (store-info : (List (List String)))
-  (if (current-store)
-      (let ([path (current-store)])
+  (if (selected-store)
+      (let ([path (selected-store)])
         (for/list ([section (in-list (store-sections path))])
           (define entries (store-section-entries path section))
           (define empties (length (filter (lambda (e) (string=? (cdr e) "")) entries)))
@@ -88,8 +95,8 @@
 
 ;; deep check: parses every key, verifies pairs, counts orphans
 (define-rpc (check-store : (List (List String)))
-  (if (current-store)
-      (let ([path (current-store)])
+  (if (selected-store)
+      (let ([path (selected-store)])
         (append
          (for/list ([row (in-list (store-check path key-summary))])
            (list (car row)
