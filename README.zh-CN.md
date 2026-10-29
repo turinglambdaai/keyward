@@ -4,8 +4,8 @@
 
 给「自己会更新的桌面应用」保管发布签名密钥的本地保险库。
 
-[![CI](https://github.com/turinglambdaai/keyward/actions/workflows/ci.yml/badge.svg)](https://github.com/turinglambdaai/keyward/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/turinglambdaai/keyward)](https://github.com/turinglambdaai/keyward/releases)
+[![CI](https://github.com/turlamai/keyward/actions/workflows/ci.yml/badge.svg)](https://github.com/turlamai/keyward/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/turlamai/keyward)](https://github.com/turlamai/keyward/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 凡是走网络自我更新的应用，最终都依赖同一套信任模型：**私钥签更新清单**，
@@ -48,7 +48,7 @@ AGPL-3.0 许可的免费发布基础设施工具，不接商业激活。 提供 
 ## 状态
 
 **v0.2.1 已发布**——三个桌面的安装包都在
-[Releases 页](https://github.com/turinglambdaai/keyward/releases/latest)：
+[Releases 页](https://github.com/turlamai/keyward/releases/latest)：
 macOS（arm64 / x64，DMG + zip）、Windows（x64，MSI + zip）、
 Linux（x64 / arm64，deb + rpm + AppImage + tar.gz + zip），每个都带
 SHA-256 sidecar。Windows（WinUI 3）与 Linux（GTK4）宿主已构建并有
