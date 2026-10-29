@@ -81,8 +81,28 @@ public struct RivetAPI: Sendable {
         let rivetResult = try await client.call("entry-set", arguments: [encode_String(product), encode_String(name), encode_String(value)])
         return try decode_String(rivetResult)
     }
+    public func keypair_export(product: String, name: String, format: String) async throws -> String {
+        let rivetResult = try await client.call("keypair-export", arguments: [encode_String(product), encode_String(name), encode_String(format)])
+        return try decode_String(rivetResult)
+    }
     public func keypair_generate(product: String) async throws -> [String] {
         let rivetResult = try await client.call("keypair-generate", arguments: [encode_String(product)])
+        return try decode__List_String_(rivetResult)
+    }
+    public func rotation_cancel(product: String) async throws -> Bool {
+        let rivetResult = try await client.call("rotation-cancel", arguments: [encode_String(product)])
+        return try decode_Bool(rivetResult)
+    }
+    public func rotation_promote(product: String) async throws -> [String] {
+        let rivetResult = try await client.call("rotation-promote", arguments: [encode_String(product)])
+        return try decode__List_String_(rivetResult)
+    }
+    public func rotation_start(product: String) async throws -> [String] {
+        let rivetResult = try await client.call("rotation-start", arguments: [encode_String(product)])
+        return try decode__List_String_(rivetResult)
+    }
+    public func rotation_status(product: String) async throws -> [String] {
+        let rivetResult = try await client.call("rotation-status", arguments: [encode_String(product)])
         return try decode__List_String_(rivetResult)
     }
     public func snapshot_list() async throws -> [[String]] {
@@ -104,5 +124,9 @@ public struct RivetAPI: Sendable {
     public func store_path() async throws -> String {
         let rivetResult = try await client.call("store-path", arguments: [])
         return try decode_String(rivetResult)
+    }
+    public func stray_scan_tree(dir: String) async throws -> [[String]] {
+        let rivetResult = try await client.call("stray-scan-tree", arguments: [encode_String(dir)])
+        return try decode__List_List_String_(rivetResult)
     }
 }
