@@ -4,8 +4,8 @@
 
 A local vault for the release-signing keys of self-updating desktop apps.
 
-[![CI](https://github.com/turinglambdaai/keyward/actions/workflows/ci.yml/badge.svg)](https://github.com/turinglambdaai/keyward/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/turinglambdaai/keyward)](https://github.com/turinglambdaai/keyward/releases)
+[![CI](https://github.com/turlamai/keyward/actions/workflows/ci.yml/badge.svg)](https://github.com/turlamai/keyward/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/turlamai/keyward)](https://github.com/turlamai/keyward/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 Every app that updates itself over the network eventually relies on the same
@@ -58,7 +58,7 @@ Free release-infrastructure tool under AGPL-3.0; no commercial activation. Deskt
 ## Status
 
 **v0.2.1 is out** — installers for all three desktops on the
-[Releases page](https://github.com/turinglambdaai/keyward/releases/latest):
+[Releases page](https://github.com/turlamai/keyward/releases/latest):
 macOS (arm64 / x64, DMG + zip), Windows (x64, MSI + zip) and Linux (x64 /
 arm64, deb + rpm + AppImage + tar.gz + zip), each with a SHA-256 sidecar.
 The Windows (WinUI 3) and Linux (GTK4) hosts are built and CI-covered.

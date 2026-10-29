@@ -8,9 +8,9 @@ Decision `2026-10-auth-1`: No commercial Permit credentials, Commerce checkout o
 
 Before starting the next bounded slice, refresh remote state safely and re-read
 this root AGENTS file, the repository's canonical implementation handoff, and
-the current [family delivery standard](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/docs/PRODUCT-STANDARD.md),
-[documentation language policy](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/docs/DOCUMENTATION-LANGUAGES.md)
-and [portfolio decisions](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/PORTFOLIO.md).
+the current [family delivery standard](https://github.com/turlamai/turlamai.github.io/blob/master/docs/PRODUCT-STANDARD.md),
+[documentation language policy](https://github.com/turlamai/turlamai.github.io/blob/master/docs/DOCUMENTATION-LANGUAGES.md)
+and [portfolio decisions](https://github.com/turlamai/turlamai.github.io/blob/master/PORTFOLIO.md).
 Follow the corresponding Chinese links when preferred; both public user paths
 must express the same promises. Product-specific plans and technical protocol
 owners remain in their owning repositories.
@@ -134,7 +134,7 @@ raco rivet verify
 Pull-request CI must run `raco rivet build` for the Windows, macOS, and Linux
 hosts on the same runner image classes used for release. A release job must not
 be the first place native source is compiled. Follow Rivet's native-host CI
-guide: https://github.com/turinglambdaai/rivet/blob/main/docs/ci.md
+guide: https://github.com/turlamai/rivet/blob/main/docs/ci.md
 
 After changing RPC, Event, State, Record, or Enum declarations, run the
 compatibility gate and rebuild before editing code that consumes generated native APIs.
@@ -163,13 +163,13 @@ nearby compiler output when diagnosing a failure.
 ## 组合定位（Portfolio placement）
 
 - 轨道与授权：轨道 4 社区引流；授权形态：AGPL-3.0；商业归属：永久免费（安全工具开源即信任；家族发布基础设施）。
-- 组合归属唯一权威：[PORTFOLIO.md](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/PORTFOLIO.md)（turinglambdaai.github.io 仓库）。改归属/授权先改权威档，再同步本节。
+- 组合归属唯一权威：[PORTFOLIO.md](https://github.com/turlamai/turlamai.github.io/blob/master/PORTFOLIO.md)（turlamai.github.io 仓库）。改归属/授权先改权威档，再同步本节。
 - 纪律：价格只进本仓 `PRICING.md`，且收费开始时才发布；README 与产品站不做价格预告。
 
 ## 产品交付与下一步（2026-10-23）
 
-- 家族[交付标准](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/docs/PRODUCT-STANDARD.md)与[组合策略](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/PORTFOLIO.md)是共用政策；本仓具体行为以 `README.md` 为准，不复制五库依赖图。
-- 当前执行入口：[产品审查 issue](https://github.com/turinglambdaai/keyward/issues/3)。先保证每个私钥都有独立解析/配对结果，不能用一个正确 key 掩盖同节其他坏 key。维持明文可逃生格式和引擎零网络；用合成临时密钥验证。
+- 家族[交付标准](https://github.com/turlamai/turlamai.github.io/blob/master/docs/PRODUCT-STANDARD.md)与[组合策略](https://github.com/turlamai/turlamai.github.io/blob/master/PORTFOLIO.md)是共用政策；本仓具体行为以 `README.md` 为准，不复制五库依赖图。
+- 当前执行入口：[产品审查 issue](https://github.com/turlamai/keyward/issues/3)。先保证每个私钥都有独立解析/配对结果，不能用一个正确 key 掩盖同节其他坏 key。维持明文可逃生格式和引擎零网络；用合成临时密钥验证。
 - 开工先检查干净工作树与远端，以 fast-forward-only 更新并记录 SHA；共享文件一次一个写入者，保留其他 checkout 的未提交工作。
 - 每次只完成一个可验收切片，记录 owned files、依赖 pin、命令/平台/产物证据和回滚。已实现、已发布、实机验收分别陈述；不修改 requirements 或复用旧证据来制造通过。
 
