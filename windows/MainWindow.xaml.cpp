@@ -149,13 +149,52 @@ std::wstring EntryPurposeHint(std::string const& name) {
     return name.size() >= len &&
            name.compare(name.size() - len, len, suffix) == 0;
   };
+  if (name == "UPDATE_ED25519_NEXT_PRIVATE_KEY_B64") {
+    return L"Staged next key — swap it into CI after the phase-1 release "
+           L"ships (Promote)";
+  }
+  if (name == "UPDATE_ED25519_NEXT_PUBLIC_KEY_SPKI_B64") {
+    return L"Staged next anchor — embed in app source during rotation "
+           L"phase 1";
+  }
+  if (name == "UPDATE_ED25519_NEXT_PUBLIC_KEY_RAW_TAIL32_B64") {
+    return L"Staged next anchor (raw 32B) — macOS host UpdateService in "
+           L"phase 1";
+  }
+  if (name == "UPDATE_ED25519_NEXT_KEY_ID") {
+    return L"Key id the staged key takes over at Promote";
+  }
   if (ends_with("_FPR")) {
     return L"Pairing anchor for Deep Check";
+  }
+  if (starts_with("UPDATE_ED25519_NEXT_")) {
+    return L"Staged rotation key — phase-1 material; Promote moves it to "
+           L"the active names";
   }
   if (starts_with("LICENSE_") || starts_with("PERMIT_")) {
     return L"Commercial signing — different lifecycle from update keys";
   }
   return L"No known consumer — confirm what reads it before deleting";
+}
+
+// Updater-native export formats by entry role — values cross to the
+// clipboard only, with the same disclosure as a plain copy.
+std::vector<std::pair<std::string, std::wstring>> ExportFormats(
+    std::string const& name) {
+  if (name.find("PRIVATE") != std::string::npos) {
+    return {
+        {"sparkle-private", L"Sparkle private key (sign_update)"},
+        {"pem-private", L"PKCS#8 PEM"},
+        {"tauri-key", L"Tauri / minisign secret key (unencrypted)"}};
+  }
+  if (name.find("PUBLIC") != std::string::npos) {
+    return {
+        {"sparkle-public", L"Sparkle SUPublicEDKey"},
+        {"tauri-pub", L"Tauri / minisign .pub file"},
+        {"tauri-pub-b64", L"Tauri pubkey for tauri.conf.json (base64)"},
+        {"pem-public", L"SPKI PEM"}};
+  }
+  return {};
 }
 
 }  // namespace
@@ -225,6 +264,7 @@ void MainWindow::SetReadyUi() {
   auto const armed = !store_path_.empty();
   DeepCheckItem().IsEnabled(armed);
   SnapshotsItem().IsEnabled(armed);
+  ScanStrayItem().IsEnabled(armed);
 }
 
 void MainWindow::SetErrorUi(std::string const& message) {
@@ -438,6 +478,7 @@ void MainWindow::SelectProduct(std::wstring const& name) {
                   window->entries_.push_back(std::move(entry));
                 }
                 window->RenderDetail();
+                window->RefreshRotation();
               }
             });
           } catch (std::exception const& e) {
@@ -861,12 +902,313 @@ void MainWindow::OpenStoreAsync(std::wstring const& path) {
                 window->checks_.clear();
                 window->entries_.clear();
                 window->snapshots_.clear();
+                window->rotation_ = {};
                 window->RenderSidebar();
                 window->RenderDetail();
                 window->RefreshProducts(nullptr);
                 window->SetStatusMessage(L"Store switched: " + wide(opened));
               }
             });
+          } catch (std::exception const& e) {
+            auto message = std::string(e.what());
+            dispatcher.TryEnqueue([weak, message = std::move(message)] {
+              if (auto window = weak.get()) {
+                window->ShowEngineMessage(message);
+              }
+            });
+          }
+        });
+  } catch (std::exception const& e) {
+    ShowEngineMessage(e.what());
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rotation, stray scan, export
+// ---------------------------------------------------------------------------
+
+void MainWindow::RefreshRotation() {
+  auto const dispatcher = DispatcherQueue();
+  auto const weak = get_weak();
+  auto backend = backend_;
+  if (!backend || !backend->running() || selected_.empty()) {
+    return;
+  }
+  try {
+    rivet_app::API api(*backend);
+    (void)api.rotation_status_async(
+        utf8_from_wide(selected_),
+        [dispatcher, weak](rivet_app::Result<std::vector<std::string>> result) {
+          try {
+            auto const row = result.get();
+            dispatcher.TryEnqueue([weak, row] {
+              if (auto window = weak.get()) {
+                window->rotation_.next_present =
+                    row.empty() ? L"no" : wide(row[0]);
+                window->rotation_.next_paired =
+                    row.size() > 1 ? wide(row[1]) : L"-";
+                window->rotation_.next_fingerprint =
+                    row.size() > 2 ? wide(row[2]) : L"-";
+                window->rotation_.next_key_id =
+                    row.size() > 3 ? wide(row[3]) : L"-";
+                window->rotation_.active_fingerprint =
+                    row.size() > 4 ? wide(row[4]) : L"-";
+                window->rotation_.active_key_id =
+                    row.size() > 5 ? wide(row[5]) : L"-";
+                window->RenderDetail();
+              }
+            });
+          } catch (std::exception const& e) {
+            auto message = std::string(e.what());
+            dispatcher.TryEnqueue([weak, message = std::move(message)] {
+              if (auto window = weak.get()) {
+                window->ShowEngineMessage(message);
+              }
+            });
+          }
+        });
+  } catch (std::exception const& e) {
+    ShowEngineMessage(e.what());
+  }
+}
+
+void MainWindow::StageNextKey() {
+  if (selected_.empty()) {
+    return;
+  }
+  auto const dispatcher = DispatcherQueue();
+  auto const weak = get_weak();
+  auto backend = backend_;
+  if (!backend || !backend->running()) {
+    return;
+  }
+  try {
+    rivet_app::API api(*backend);
+    (void)api.rotation_start_async(
+        utf8_from_wide(selected_),
+        [dispatcher, weak](rivet_app::Result<std::vector<std::string>> result) {
+          try {
+            auto const row = result.get();
+            dispatcher.TryEnqueue([weak, row] {
+              if (auto window = weak.get()) {
+                auto const key_id = row.empty() ? L"" : wide(row[0]);
+                auto const fingerprint = row.size() > 1 ? wide(row[1]) : L"";
+                window->SetStatusMessage(
+                    L"Staged next key " + key_id + L" — fingerprint " +
+                    fingerprint +
+                    L". Embed its public anchors in app source and ship a "
+                    L"phase-1 release before promoting.");
+                window->RefreshProducts([weak]() -> void {
+                  if (auto current = weak.get()) {
+                    if (!current->selected_.empty()) {
+                      current->SelectProduct(current->selected_);
+                    }
+                  }
+                });
+              }
+            });
+          } catch (std::exception const& e) {
+            auto message = std::string(e.what());
+            dispatcher.TryEnqueue([weak, message = std::move(message)] {
+              if (auto window = weak.get()) {
+                window->ShowEngineMessage(message);
+              }
+            });
+          }
+        });
+  } catch (std::exception const& e) {
+    ShowEngineMessage(e.what());
+  }
+}
+
+void MainWindow::PromoteNextKey() {
+  if (selected_.empty()) {
+    return;
+  }
+  auto const dispatcher = DispatcherQueue();
+  auto const weak = get_weak();
+  auto backend = backend_;
+  if (!backend || !backend->running()) {
+    return;
+  }
+  try {
+    rivet_app::API api(*backend);
+    (void)api.rotation_promote_async(
+        utf8_from_wide(selected_),
+        [dispatcher, weak](rivet_app::Result<std::vector<std::string>> result) {
+          try {
+            auto const row = result.get();
+            dispatcher.TryEnqueue([weak, row] {
+              if (auto window = weak.get()) {
+                auto const key_id = row.empty() ? L"" : wide(row[0]);
+                auto const fingerprint = row.size() > 1 ? wide(row[1]) : L"";
+                window->SetStatusMessage(
+                    L"Promoted " + key_id + L" — fingerprint " + fingerprint +
+                    L". Now swap the CI secret to the new private key; "
+                    L"releases sign with the new key from here.");
+                window->RefreshProducts([weak]() -> void {
+                  if (auto current = weak.get()) {
+                    if (!current->selected_.empty()) {
+                      current->SelectProduct(current->selected_);
+                    }
+                  }
+                });
+              }
+            });
+          } catch (std::exception const& e) {
+            auto message = std::string(e.what());
+            dispatcher.TryEnqueue([weak, message = std::move(message)] {
+              if (auto window = weak.get()) {
+                window->ShowEngineMessage(message);
+              }
+            });
+          }
+        });
+  } catch (std::exception const& e) {
+    ShowEngineMessage(e.what());
+  }
+}
+
+void MainWindow::DiscardNextKey() {
+  if (selected_.empty()) {
+    return;
+  }
+  auto const dispatcher = DispatcherQueue();
+  auto const weak = get_weak();
+  auto backend = backend_;
+  if (!backend || !backend->running()) {
+    return;
+  }
+  try {
+    rivet_app::API api(*backend);
+    (void)api.rotation_cancel_async(
+        utf8_from_wide(selected_),
+        [dispatcher, weak](rivet_app::Result<bool> result) {
+          try {
+            result.get();
+            dispatcher.TryEnqueue([weak] {
+              if (auto window = weak.get()) {
+                window->SetStatusMessage(
+                    L"Discarded the staged next key (snapshot taken)");
+                window->RefreshProducts([weak]() -> void {
+                  if (auto current = weak.get()) {
+                    if (!current->selected_.empty()) {
+                      current->SelectProduct(current->selected_);
+                    }
+                  }
+                });
+              }
+            });
+          } catch (std::exception const& e) {
+            auto message = std::string(e.what());
+            dispatcher.TryEnqueue([weak, message = std::move(message)] {
+              if (auto window = weak.get()) {
+                window->ShowEngineMessage(message);
+              }
+            });
+          }
+        });
+  } catch (std::exception const& e) {
+    ShowEngineMessage(e.what());
+  }
+}
+
+void MainWindow::RunStrayScan(std::wstring const& path) {
+  auto const dispatcher = DispatcherQueue();
+  auto const weak = get_weak();
+  auto backend = backend_;
+  if (!backend || !backend->running()) {
+    return;
+  }
+  try {
+    rivet_app::API api(*backend);
+    (void)api.stray_scan_tree_async(
+        utf8_from_wide(path),
+        [dispatcher, weak](
+            rivet_app::Result<std::vector<std::vector<std::string>>> result) {
+          try {
+            auto const rows = result.get();
+            dispatcher.TryEnqueue([weak, rows] {
+              if (auto window = weak.get()) {
+                window->stray_rows_.clear();
+                for (auto const& row : rows) {
+                  StrayRow hit;
+                  if (!row.empty()) hit.path = wide(row[0]);
+                  if (row.size() > 1) hit.line = wide(row[1]);
+                  if (row.size() > 2) hit.kind = wide(row[2]);
+                  if (row.size() > 3) hit.fingerprint = wide(row[3]);
+                  window->stray_rows_.push_back(std::move(hit));
+                }
+                window->SetStatusMessage(
+                    L"Stray-key scan finished — " +
+                    std::to_wstring(window->stray_rows_.size()) + L" hits");
+                window->StrayScanDialogAsync();
+              }
+            });
+          } catch (std::exception const& e) {
+            auto message = std::string(e.what());
+            dispatcher.TryEnqueue([weak, message = std::move(message)] {
+              if (auto window = weak.get()) {
+                window->ShowEngineMessage(message);
+              }
+            });
+          }
+        });
+  } catch (std::exception const& e) {
+    ShowEngineMessage(e.what());
+  }
+}
+
+void MainWindow::CopyExport(EntryRow const& entry, std::string format) {
+  if (selected_.empty()) {
+    return;
+  }
+  auto const product = selected_;
+  auto const generation = selection_generation_;
+  auto const dispatcher = DispatcherQueue();
+  auto const weak = get_weak();
+  auto backend = backend_;
+  if (!backend || !backend->running()) {
+    return;
+  }
+  try {
+    rivet_app::API api(*backend);
+    (void)api.keypair_export_async(
+        utf8_from_wide(product), entry.name, format,
+        [dispatcher, weak, name = entry.name, product, generation,
+         format](rivet_app::Result<std::string> result) {
+          try {
+            auto const value = result.get();
+            dispatcher.TryEnqueue(
+                [weak, name, value, product, generation, format] {
+                  if (auto window = weak.get()) {
+                    if (window->selected_ != product ||
+                        generation != window->selection_generation_) {
+                      window->SetStatusMessage(
+                          L"Copy skipped — selection changed");
+                      return;
+                    }
+                    try {
+                      winrt::Windows::ApplicationModel::DataTransfer::
+                          DataPackage package;
+                      package.SetText(winrt::to_hstring(value));
+                      package.Properties().Title(L"Keyward copied secret");
+                      winrt::Windows::ApplicationModel::DataTransfer::
+                          Clipboard::SetContent(package);
+                    } catch (...) {
+                      window->SetStatusMessage(L"Copy failed — the "
+                                               L"clipboard rejected the "
+                                               L"content");
+                      return;
+                    }
+                    window->ScheduleClipboardExpiry();
+                    window->SetStatusMessage(
+                        L"Copied " + wide(name) + L" as " + wide(format) +
+                        L" — raw value on the clipboard, other apps can "
+                        L"read it; auto-clears in 30 s unless something "
+                        L"else copies first");
+                  }
+                });
           } catch (std::exception const& e) {
             auto message = std::string(e.what());
             dispatcher.TryEnqueue([weak, message = std::move(message)] {
@@ -1174,6 +1516,110 @@ void MainWindow::RenderDetail() {
   header.Child(header_stack);
   children.Append(header);
 
+  // ---- rotation card (the two-phase runbook) ----
+  auto const staged = rotation_.next_present == L"yes";
+  mxc::Border rotation_card;
+  rotation_card.CornerRadius({14, 14, 14, 14});
+  rotation_card.Padding({18, 18, 18, 18});
+  rotation_card.Background(OverlayBrush());
+  mxc::StackPanel rotation_stack;
+  rotation_stack.Spacing(8);
+
+  mxc::Grid rotation_header;
+  rotation_header.ColumnSpacing(8);
+  rotation_header.ColumnDefinitions().Append(mxc::ColumnDefinition{});
+  rotation_header.ColumnDefinitions().Append(mxc::ColumnDefinition{});
+  rotation_header.ColumnDefinitions().GetAt(0).Width(
+      mx::GridLength{1, mx::GridUnitType::Star});
+  rotation_header.ColumnDefinitions().GetAt(1).Width(
+      mx::GridLength{0, mx::GridUnitType::Auto});
+  mxc::TextBlock rotation_caption;
+  rotation_caption.Text(L"Rotation");
+  rotation_caption.FontSize(13);
+  rotation_caption.FontWeight(FontSemiBold());
+  rotation_caption.Foreground(DimBrush());
+  mxc::Grid::SetColumn(rotation_caption, 0);
+  rotation_header.Children().Append(rotation_caption);
+
+  mxc::StackPanel rotation_actions;
+  rotation_actions.Orientation(mx::Controls::Orientation::Horizontal);
+  rotation_actions.Spacing(8);
+  auto const rotation_weak = get_weak();
+  if (staged) {
+    mxc::Button discard_button;
+    discard_button.Content(winrt::box_value(L"Discard Staged Key…"));
+    discard_button.FontSize(12);
+    discard_button.Padding({10, 4, 10, 4});
+    discard_button.Click([rotation_weak](auto const&, auto const&) {
+      if (auto window = rotation_weak.get()) {
+        window->ConfirmDiscardKeyAsync();
+      }
+    });
+    rotation_actions.Children().Append(discard_button);
+    mxc::Button promote_button;
+    promote_button.Content(winrt::box_value(L"Promote…"));
+    promote_button.FontSize(12);
+    promote_button.Padding({10, 4, 10, 4});
+    promote_button.IsEnabled(rotation_.next_paired == L"ok");
+    promote_button.Click([rotation_weak](auto const&, auto const&) {
+      if (auto window = rotation_weak.get()) {
+        window->ConfirmPromoteKeyAsync();
+      }
+    });
+    rotation_actions.Children().Append(promote_button);
+  } else {
+    mxc::Button stage_button;
+    stage_button.Content(winrt::box_value(L"Stage Next Key…"));
+    stage_button.FontSize(12);
+    stage_button.Padding({10, 4, 10, 4});
+    stage_button.Click([rotation_weak](auto const&, auto const&) {
+      if (auto window = rotation_weak.get()) {
+        window->ConfirmStageKeyAsync();
+      }
+    });
+    rotation_actions.Children().Append(stage_button);
+  }
+  mxc::Grid::SetColumn(rotation_actions, 1);
+  rotation_header.Children().Append(rotation_actions);
+  rotation_stack.Children().Append(rotation_header);
+
+  if (staged) {
+    mxc::StackPanel rotation_chips;
+    rotation_chips.Orientation(mx::Controls::Orientation::Horizontal);
+    rotation_chips.Spacing(8);
+    rotation_chips.Children().Append(MakeChip(
+        L"NEXT KEY ID", rotation_.next_key_id, true, false, false));
+    rotation_chips.Children().Append(MakeChip(L"NEXT FINGERPRINT",
+                                              rotation_.next_fingerprint,
+                                              true, false, false));
+    rotation_chips.Children().Append(
+        MakeChip(L"PAIRED", rotation_.next_paired, false,
+                 rotation_.next_paired == L"ok",
+                 rotation_.next_paired != L"ok"));
+    rotation_stack.Children().Append(rotation_chips);
+    mxc::TextBlock guidance;
+    guidance.Text(
+        L"Phase 1 in progress: copy the staged public anchors below (Copy "
+        L"as… menu) into app source, ship a release signed with the old "
+        L"key, then Promote and swap the CI secret.");
+    guidance.FontSize(11);
+    guidance.TextWrapping(mx::TextWrapping::Wrap);
+    guidance.Foreground(DimBrush());
+    rotation_stack.Children().Append(guidance);
+  } else {
+    mxc::TextBlock quiet;
+    quiet.Text(
+        L"No key staged. Staging generates a next pair under "
+        L"UPDATE_ED25519_NEXT_* while the active signing key keeps "
+        L"releasing untouched.");
+    quiet.FontSize(11);
+    quiet.TextWrapping(mx::TextWrapping::Wrap);
+    quiet.Foreground(DimBrush());
+    rotation_stack.Children().Append(quiet);
+  }
+  rotation_card.Child(rotation_stack);
+  children.Append(rotation_card);
+
   // ---- entries section ----
   mxc::Grid entries_header;
   entries_header.ColumnSpacing(8);
@@ -1204,7 +1650,7 @@ void MainWindow::RenderDetail() {
   });
   add_flyout.Items().Append(new_entry_item);
   auto import_item = mxc::MenuFlyoutItem();
-  import_item.Text(L"Import PEM file…");
+  import_item.Text(L"Import key file…");
   import_item.Click([weak](auto const&, auto const&) {
     if (auto window = weak.get()) {
       window->ImportKeyPickAsync("UPDATE_ED25519_PRIVATE_KEY_B64");
@@ -1324,8 +1770,25 @@ mx::UIElement MainWindow::MakeEntryCard(EntryRow const& entry) {
     }
   });
   row_menu.Items().Append(menu_copy);
+  // Copy as…: updater-native export formats, clipboard-only (macOS parity).
+  auto const formats = ExportFormats(entry.name);
+  if (!formats.empty()) {
+    mxc::MenuFlyoutSubItem export_menu;
+    export_menu.Text(L"Copy as…");
+    for (auto const& [format, label] : formats) {
+      mxc::MenuFlyoutItem item;
+      item.Text(winrt::hstring(label));
+      item.Click([weak, entry, format](auto const&, auto const&) {
+        if (auto window = weak.get()) {
+          window->CopyExport(entry, format);
+        }
+      });
+      export_menu.Items().Append(item);
+    }
+    row_menu.Items().Append(export_menu);
+  }
   auto menu_import = mxc::MenuFlyoutItem();
-  menu_import.Text(L"Import PEM file…");
+  menu_import.Text(L"Import key file…");
   menu_import.Click([weak, entry](auto const&, auto const&) {
     if (auto window = weak.get()) {
       window->ImportKeyPickAsync(entry.name);
@@ -1541,6 +2004,157 @@ winrt::fire_and_forget MainWindow::SnapshotsDialogAsync() {
   snapshot_refresher_ = nullptr;
 }
 
+winrt::fire_and_forget MainWindow::ConfirmStageKeyAsync() {
+  if (selected_.empty()) {
+    co_return;
+  }
+  auto body = mxc::TextBlock{};
+  body.Text(L"A new Ed25519 pair is written under UPDATE_ED25519_NEXT_* "
+            L"entries; any currently staged pair is replaced. The active "
+            L"signing key is untouched.");
+  body.TextWrapping(mx::TextWrapping::Wrap);
+  auto dialog = mxc::ContentDialog{};
+  dialog.Title(winrt::box_value(L"Stage a next update key for " + selected_ +
+                                L"?"));
+  dialog.Content(winrt::box_value(body));
+  dialog.PrimaryButtonText(L"Stage");
+  dialog.CloseButtonText(L"Cancel");
+  // Return lands on Cancel, never on the destructive action — the same
+  // safe default as the macOS and Linux confirm dialogs.
+  dialog.DefaultButton(mxc::ContentDialogButton::Close);
+  dialog.XamlRoot(Content().XamlRoot());
+  auto const choice = co_await dialog.ShowAsync();
+  if (choice != mxc::ContentDialogResult::Primary) {
+    co_return;
+  }
+  StageNextKey();
+}
+
+winrt::fire_and_forget MainWindow::ConfirmPromoteKeyAsync() {
+  if (selected_.empty()) {
+    co_return;
+  }
+  auto body = mxc::TextBlock{};
+  body.Text(L"The UPDATE_ED25519_* entries take over the staged values and "
+            L"the NEXT entries are removed. Afterwards every release signs "
+            L"with the new key — swap the GitHub CI secret first, and only "
+            L"promote once the phase-1 release (embedding the new public "
+            L"anchors) has shipped.");
+  body.TextWrapping(mx::TextWrapping::Wrap);
+  auto dialog = mxc::ContentDialog{};
+  dialog.Title(winrt::box_value(
+      L"Promote the staged key to the active signing key?"));
+  dialog.Content(winrt::box_value(body));
+  dialog.PrimaryButtonText(L"Promote");
+  dialog.CloseButtonText(L"Cancel");
+  dialog.DefaultButton(mxc::ContentDialogButton::Close);
+  dialog.XamlRoot(Content().XamlRoot());
+  auto const choice = co_await dialog.ShowAsync();
+  if (choice != mxc::ContentDialogResult::Primary) {
+    co_return;
+  }
+  PromoteNextKey();
+}
+
+winrt::fire_and_forget MainWindow::ConfirmDiscardKeyAsync() {
+  auto body = mxc::TextBlock{};
+  body.Text(L"The staged UPDATE_ED25519_NEXT_* entries are deleted. The "
+            L"active signing key is untouched, and a snapshot keeps the "
+            L"staged material recoverable.");
+  body.TextWrapping(mx::TextWrapping::Wrap);
+  auto dialog = mxc::ContentDialog{};
+  dialog.Title(winrt::box_value(L"Discard the staged next key?"));
+  dialog.Content(winrt::box_value(body));
+  dialog.PrimaryButtonText(L"Discard");
+  dialog.CloseButtonText(L"Cancel");
+  dialog.DefaultButton(mxc::ContentDialogButton::Close);
+  dialog.XamlRoot(Content().XamlRoot());
+  auto const choice = co_await dialog.ShowAsync();
+  if (choice != mxc::ContentDialogResult::Primary) {
+    co_return;
+  }
+  DiscardNextKey();
+}
+
+winrt::fire_and_forget MainWindow::StrayScanDialogAsync() {
+  auto rows_panel = mxc::StackPanel{};
+  rows_panel.Spacing(6);
+  if (stray_rows_.empty()) {
+    mxc::TextBlock empty;
+    empty.Text(L"No stray private keys found");
+    empty.FontSize(13);
+    empty.Foreground(DimBrush());
+    rows_panel.Children().Append(empty);
+  }
+  for (auto const& row : stray_rows_) {
+    mxc::StackPanel hit;
+    hit.Spacing(1);
+    mxc::TextBlock path;
+    path.Text(winrt::hstring(row.path));
+    path.FontSize(12);
+    path.FontFamily(mx::Media::FontFamily(L"Consolas"));
+    mxc::TextBlock detail;
+    detail.Text(winrt::hstring(row.line.empty()
+                                   ? row.kind
+                                   : row.kind + L" — line " + row.line));
+    detail.FontSize(10);
+    detail.Foreground(DimBrush());
+    hit.Children().Append(path);
+    hit.Children().Append(detail);
+    if (!row.fingerprint.empty() && row.fingerprint != L"-") {
+      mxc::TextBlock fp;
+      fp.Text(winrt::hstring(row.fingerprint));
+      fp.FontSize(11);
+      fp.FontFamily(mx::Media::FontFamily(L"Consolas"));
+      fp.Foreground(DimBrush());
+      hit.Children().Append(fp);
+    }
+    rows_panel.Children().Append(hit);
+  }
+  auto scroller = mxc::ScrollViewer{};
+  scroller.MaxHeight(340);
+  scroller.Content(rows_panel);
+  auto panel = mxc::StackPanel{};
+  panel.Spacing(8);
+  auto caption = mxc::TextBlock{};
+  caption.Text(
+      L"Private keys found outside the vault — collect them (Import) and "
+      L"delete the stray copies. Only paths, line numbers and fingerprints "
+      L"are shown.");
+  caption.FontSize(12);
+  caption.TextWrapping(mx::TextWrapping::Wrap);
+  caption.Foreground(DimBrush());
+  panel.Children().Append(caption);
+  panel.Children().Append(scroller);
+
+  auto dialog = mxc::ContentDialog{};
+  dialog.Title(winrt::box_value(L"Stray keys in the scanned folder"));
+  dialog.Content(winrt::box_value(panel));
+  dialog.CloseButtonText(L"Done");
+  dialog.XamlRoot(Content().XamlRoot());
+  co_await dialog.ShowAsync();
+}
+
+winrt::fire_and_forget MainWindow::ScanFolderPickAsync() {
+  auto picker = winrt::Windows::Storage::Pickers::FolderPicker{};
+  auto window_native = try_as<::IWindowNative>();
+  if (window_native) {
+    HWND hwnd = nullptr;
+    if (SUCCEEDED(window_native->get_WindowHandle(&hwnd))) {
+      if (auto initializer = picker.try_as<::IInitializeWithWindow>()) {
+        initializer->Initialize(hwnd);
+      }
+    }
+  }
+  // Desktop apps must declare at least one file type filter for the
+  // FolderPicker to function.
+  picker.FileTypeFilter().Append(L"*");
+  auto const folder = co_await picker.PickSingleFolderAsync();
+  if (folder != nullptr) {
+    RunStrayScan(std::wstring(folder.Path()));
+  }
+}
+
 winrt::fire_and_forget MainWindow::OpenVaultPickAsync() {
   auto picker = winrt::Windows::Storage::Pickers::FileOpenPicker{};
   auto window_native = try_as<::IWindowNative>();
@@ -1630,6 +2244,12 @@ void MainWindow::OnSnapshots(
     winrt::Windows::Foundation::IInspectable const&,
     mx::RoutedEventArgs const&) {
   SnapshotsDialogAsync();
+}
+
+void MainWindow::OnScanStrayKeys(
+    winrt::Windows::Foundation::IInspectable const&,
+    mx::RoutedEventArgs const&) {
+  ScanFolderPickAsync();
 }
 
 winrt::fire_and_forget MainWindow::OnAbout(

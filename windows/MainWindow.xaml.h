@@ -27,6 +27,8 @@ struct MainWindow : MainWindowT<MainWindow> {
                    Microsoft::UI::Xaml::RoutedEventArgs const&);
   void OnSnapshots(winrt::Windows::Foundation::IInspectable const&,
                    Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void OnScanStrayKeys(winrt::Windows::Foundation::IInspectable const&,
+                       Microsoft::UI::Xaml::RoutedEventArgs const&);
   winrt::fire_and_forget OnAbout(
       winrt::Windows::Foundation::IInspectable const&,
       Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -58,6 +60,24 @@ struct MainWindow : MainWindowT<MainWindow> {
     std::string stamp;
     std::string size;
   };
+  // Rotation staging state for the selected product — identifiers and
+  // fingerprints only, straight from `rotation-status`.
+  struct RotationState {
+    std::wstring next_present;
+    std::wstring next_paired;
+    std::wstring next_fingerprint;
+    std::wstring next_key_id;
+    std::wstring active_fingerprint;
+    std::wstring active_key_id;
+  };
+  // One stray-key scan hit: path, 1-based line, kind, fingerprint — values
+  // never.
+  struct StrayRow {
+    std::wstring path;
+    std::wstring line;
+    std::wstring kind;
+    std::wstring fingerprint;
+  };
 
   winrt::fire_and_forget InitializeBackendAsync();
 
@@ -83,6 +103,16 @@ struct MainWindow : MainWindowT<MainWindow> {
   void LoadSnapshots();
   void RestoreSnapshot(SnapshotRow const& snap);
   void OpenStoreAsync(std::wstring const& path);
+  // Two-phase rotation (the runbook): stage next, promote, discard; the
+  // status row drives the Rotation card's chips and affordances.
+  void RefreshRotation();
+  void StageNextKey();
+  void PromoteNextKey();
+  void DiscardNextKey();
+  // Working-tree stray-key scan: folder pick + results dialog.
+  void RunStrayScan(std::wstring const& path);
+  // Clipboard-only export of an entry in an updater-native format.
+  void CopyExport(EntryRow const& entry, std::string format);
 
   // Rendering (plain rebuild — the row counts are vault-scale small).
   void RenderSidebar();
@@ -93,8 +123,13 @@ struct MainWindow : MainWindowT<MainWindow> {
   winrt::fire_and_forget NewEntryDialogAsync();
   winrt::fire_and_forget ConfirmDeleteAsync(std::string name);
   winrt::fire_and_forget ConfirmGenerateKeyAsync();
+  winrt::fire_and_forget ConfirmStageKeyAsync();
+  winrt::fire_and_forget ConfirmPromoteKeyAsync();
+  winrt::fire_and_forget ConfirmDiscardKeyAsync();
   winrt::fire_and_forget SnapshotsDialogAsync();
+  winrt::fire_and_forget StrayScanDialogAsync();
   winrt::fire_and_forget OpenVaultPickAsync();
+  winrt::fire_and_forget ScanFolderPickAsync();
   winrt::fire_and_forget ImportKeyPickAsync(std::string name);
   winrt::fire_and_forget ShowEngineMessage(std::string message);
 
@@ -104,6 +139,8 @@ struct MainWindow : MainWindowT<MainWindow> {
   std::vector<CheckRow> checks_;
   std::vector<EntryRow> entries_;
   std::vector<SnapshotRow> snapshots_;
+  std::vector<StrayRow> stray_rows_;
+  RotationState rotation_{};
   std::wstring selected_;
   std::wstring store_path_;
   // Bumped on every selection change; async entry/copy completions carry

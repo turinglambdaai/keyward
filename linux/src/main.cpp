@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <utility>
 #include <type_traits>
 #include <vector>
 
@@ -52,6 +53,26 @@ struct SnapshotRow {
   std::string size;
 };
 
+// Rotation staging state for the selected product — identifiers and
+// fingerprints only, straight from `rotation-status`.
+struct RotationState {
+  std::string next_present;
+  std::string next_paired;
+  std::string next_fingerprint;
+  std::string next_key_id;
+  std::string active_fingerprint;
+  std::string active_key_id;
+};
+
+// One stray-key scan hit: path, 1-based line, kind, fingerprint — values
+// never.
+struct StrayRow {
+  std::string path;
+  std::string line;
+  std::string kind;
+  std::string fingerprint;
+};
+
 constexpr char const* kGuideUrl =
     "https://github.com/turinglambdaai/keyward/blob/main/docs/GUIDE.zh-CN.md";
 constexpr char const* kIssuesUrl =
@@ -81,6 +102,8 @@ struct AppState {
   std::vector<CheckRow> checks;
   std::vector<EntryRow> entries;
   std::vector<SnapshotRow> snapshots;
+  std::vector<StrayRow> stray_rows;
+  RotationState rotation;
   std::string selected;
   // Bumped on every selection change; async entry/copy completions carry
   // the generation they were issued under and are dropped when stale, so
@@ -94,6 +117,7 @@ struct AppState {
   guint clipboard_expiry_source{0};
   GSimpleAction* deep_check_action{nullptr};
   GSimpleAction* snapshots_action{nullptr};
+  GSimpleAction* scan_stray_action{nullptr};
   // Rows refresher of the open snapshots dialog (null when closed).
   std::function<void()>* snapshot_refresher{nullptr};
 };
@@ -128,6 +152,18 @@ void show_generate_confirm();
 void show_snapshots_dialog();
 void show_about_dialog();
 void show_guide();
+// Two-phase rotation (the runbook) + stray scan + native export.
+void refresh_rotation();
+void stage_next_key();
+void promote_next_key();
+void discard_next_key();
+void run_stray_scan(std::string const& path);
+void copy_export(std::string const& name, std::string const& format);
+void show_stage_confirm();
+void show_promote_confirm();
+void show_discard_confirm();
+void show_stray_scan_dialog();
+void stray_scan_dialog();
 
 // ---------------------------------------------------------------------------
 // UI dispatch (completions arrive on the backend reader thread)
@@ -273,6 +309,20 @@ char const* entry_purpose_hint(std::string const& name) {
   if (name == "RIVET_UPDATE_KEY_ID") {
     return "Written into the signed update manifest";
   }
+  if (name == "UPDATE_ED25519_NEXT_PRIVATE_KEY_B64") {
+    return "Staged next key — swap it into CI after the phase-1 release "
+           "ships (Promote)";
+  }
+  if (name == "UPDATE_ED25519_NEXT_PUBLIC_KEY_SPKI_B64") {
+    return "Staged next anchor — embed in app source during rotation phase 1";
+  }
+  if (name == "UPDATE_ED25519_NEXT_PUBLIC_KEY_RAW_TAIL32_B64") {
+    return "Staged next anchor (raw 32B) — macOS host UpdateService in "
+           "phase 1";
+  }
+  if (name == "UPDATE_ED25519_NEXT_KEY_ID") {
+    return "Key id the staged key takes over at Promote";
+  }
   auto const ends_with = [&name](char const* suffix) {
     size_t const len = std::strlen(suffix);
     return name.size() >= len &&
@@ -284,10 +334,32 @@ char const* entry_purpose_hint(std::string const& name) {
   if (ends_with("_FPR")) {
     return "Pairing anchor for Deep Check";
   }
+  if (starts_with("UPDATE_ED25519_NEXT_")) {
+    return "Staged rotation key — phase-1 material; Promote moves it to the "
+           "active names";
+  }
   if (starts_with("LICENSE_") || starts_with("PERMIT_")) {
     return "Commercial signing — different lifecycle from update keys";
   }
   return "No known consumer — confirm what reads it before deleting";
+}
+
+// Updater-native export formats by entry role — values cross to the
+// clipboard only, with the same disclosure as a plain copy.
+std::vector<std::pair<std::string, char const*>> export_formats(
+    std::string const& name) {
+  if (name.find("PRIVATE") != std::string::npos) {
+    return {{"sparkle-private", "Sparkle private key (sign_update)"},
+            {"pem-private", "PKCS#8 PEM"},
+            {"tauri-key", "Tauri / minisign secret key (unencrypted)"}};
+  }
+  if (name.find("PUBLIC") != std::string::npos) {
+    return {{"sparkle-public", "Sparkle SUPublicEDKey"},
+            {"tauri-pub", "Tauri / minisign .pub file"},
+            {"tauri-pub-b64", "Tauri pubkey for tauri.conf.json (base64)"},
+            {"pem-public", "SPKI PEM"}};
+  }
+  return {};
 }
 
 // Ownership-marker mime for the clipboard expiry: it rides along with the
@@ -356,6 +428,9 @@ void set_engine_ready() {
   }
   if (g_state.snapshots_action != nullptr) {
     g_simple_action_set_enabled(g_state.snapshots_action, armed);
+  }
+  if (g_state.scan_stray_action != nullptr) {
+    g_simple_action_set_enabled(g_state.scan_stray_action, armed);
   }
 }
 
@@ -582,6 +657,70 @@ void rebuild_detail() {
   }
   gtk_box_append(GTK_BOX(root), header);
 
+  // ---- rotation card (the two-phase runbook) ----
+  {
+    bool const staged = g_state.rotation.next_present == "yes";
+    auto* card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    gtk_widget_add_css_class(card, "kw-card");
+    auto* row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    auto* caption = make_label("Rotation", "kw-dim");
+    gtk_widget_set_hexpand(caption, TRUE);
+    gtk_label_set_xalign(GTK_LABEL(caption), 0.0f);
+    gtk_box_append(GTK_BOX(row), caption);
+    if (staged) {
+      auto* discard = gtk_button_new_with_label("Discard Staged Key…");
+      gtk_actionable_set_action_name(GTK_ACTIONABLE(discard),
+                                     "win.discard-key");
+      gtk_widget_set_valign(discard, GTK_ALIGN_CENTER);
+      gtk_box_append(GTK_BOX(row), discard);
+      auto* promote = gtk_button_new_with_label("Promote…");
+      gtk_actionable_set_action_name(GTK_ACTIONABLE(promote),
+                                     "win.promote-key");
+      // Promote waits for a staged pair that passes pairing.
+      gtk_widget_set_sensitive(promote,
+                               g_state.rotation.next_paired == "ok");
+      gtk_widget_set_valign(promote, GTK_ALIGN_CENTER);
+      gtk_box_append(GTK_BOX(row), promote);
+    } else {
+      auto* stage = gtk_button_new_with_label("Stage Next Key…");
+      gtk_actionable_set_action_name(GTK_ACTIONABLE(stage), "win.stage-key");
+      gtk_widget_set_valign(stage, GTK_ALIGN_CENTER);
+      gtk_box_append(GTK_BOX(row), stage);
+    }
+    gtk_box_append(GTK_BOX(card), row);
+
+    if (staged) {
+      auto* chips = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+      gtk_box_append(GTK_BOX(chips), make_chip("NEXT KEY ID",
+                                               g_state.rotation.next_key_id,
+                                               "kw-mono"));
+      gtk_box_append(GTK_BOX(chips),
+                     make_chip("NEXT FINGERPRINT",
+                               g_state.rotation.next_fingerprint, "kw-mono"));
+      gtk_box_append(GTK_BOX(chips),
+                     make_chip("PAIRED", g_state.rotation.next_paired,
+                               g_state.rotation.next_paired == "ok"
+                                   ? "kw-chip-ok"
+                                   : "kw-chip-warn"));
+      gtk_box_append(GTK_BOX(card), chips);
+      gtk_box_append(
+          GTK_BOX(card),
+          make_label("Phase 1 in progress: copy the staged public anchors "
+                     "below (Copy as… menu) into app source, ship a release "
+                     "signed with the old key, then Promote and swap the CI "
+                     "secret.",
+                     "kw-dim"));
+    } else {
+      gtk_box_append(
+          GTK_BOX(card),
+          make_label("No key staged. Staging generates a next pair under "
+                     "UPDATE_ED25519_NEXT_* while the active signing key "
+                     "keeps releasing untouched.",
+                     "kw-dim"));
+    }
+    gtk_box_append(GTK_BOX(root), card);
+  }
+
   // ---- entries section ----
   auto* entries_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   auto* entries_caption = make_label("Entries", "kw-dim");
@@ -596,7 +735,7 @@ void rebuild_detail() {
   gtk_widget_set_tooltip_text(GTK_WIDGET(add_button), "Add");
   auto* add_menu = g_menu_new();
   g_menu_append(add_menu, "New entry…", "win.new-entry");
-  g_menu_append(add_menu, "Import PEM file…", "win.import-update-key");
+  g_menu_append(add_menu, "Import key file…", "win.import-update-key");
   g_menu_append(add_menu, "Generate update key…", "win.generate-key");
   gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(add_button),
                                  G_MENU_MODEL(add_menu));
@@ -664,7 +803,23 @@ void rebuild_detail() {
                                       entry.name.c_str());
     g_menu_append_item(menu, copy_item);
     g_object_unref(copy_item);
-    auto* import_item = g_menu_item_new("Import PEM file…", nullptr);
+    // Copy as…: updater-native export formats, clipboard-only
+    // (macOS/Windows parity). The action parameter packs "name|format".
+    auto formats = export_formats(entry.name);
+    if (!formats.empty()) {
+      auto* submenu = g_menu_new();
+      for (auto const& [format, label] : formats) {
+        auto* item = g_menu_item_new(label, nullptr);
+        g_menu_item_set_action_and_target(
+            item, "win.copy-export", "s",
+            (entry.name + "|" + format).c_str());
+        g_menu_append_item(submenu, item);
+        g_object_unref(item);
+      }
+      g_menu_append_submenu(menu, "Copy as…", G_MENU_MODEL(submenu));
+      g_object_unref(submenu);
+    }
+    auto* import_item = g_menu_item_new("Import key file…", nullptr);
     g_menu_item_set_action_and_target(import_item, "win.import-entry", "s",
                                       entry.name.c_str());
     g_menu_append_item(menu, import_item);
@@ -921,6 +1076,180 @@ void show_generate_confirm() {
   gtk_window_present(GTK_WINDOW(dialog));
 }
 
+void show_stage_confirm() {
+  if (g_state.selected.empty()) return;
+  auto* dialog = gtk_message_dialog_new(
+      GTK_WINDOW(g_state.window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING,
+      GTK_BUTTONS_OK_CANCEL, "Stage a next update key for %s?",
+      g_state.selected.c_str());
+  gtk_message_dialog_format_secondary_text(
+      GTK_MESSAGE_DIALOG(dialog),
+      "A new Ed25519 pair is written under UPDATE_ED25519_NEXT_* entries; "
+      "any currently staged pair is replaced. The active signing key is "
+      "untouched.");
+  // Named button and a safe default: Return lands on Cancel, never on the
+  // destructive action (macOS/Windows parity).
+  if (auto* ok = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog),
+                                                    GTK_RESPONSE_OK)) {
+    gtk_button_set_label(GTK_BUTTON(ok), "_Stage");
+  }
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CANCEL);
+  g_signal_connect(
+      dialog, "response",
+      G_CALLBACK(+[](GtkDialog* dialog, gint response, gpointer) {
+        if (response == GTK_RESPONSE_OK) {
+          stage_next_key();
+        }
+        gtk_window_destroy(GTK_WINDOW(dialog));
+      }),
+      nullptr);
+  gtk_window_present(GTK_WINDOW(dialog));
+}
+
+void show_promote_confirm() {
+  if (g_state.selected.empty()) return;
+  auto* dialog = gtk_message_dialog_new(
+      GTK_WINDOW(g_state.window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING,
+      GTK_BUTTONS_OK_CANCEL,
+      "Promote the staged key to the active signing key?");
+  gtk_message_dialog_format_secondary_text(
+      GTK_MESSAGE_DIALOG(dialog),
+      "The UPDATE_ED25519_* entries take over the staged values and the "
+      "NEXT entries are removed. Afterwards every release signs with the new "
+      "key — swap the GitHub CI secret first, and only promote once the "
+      "phase-1 release (embedding the new public anchors) has shipped.");
+  if (auto* ok = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog),
+                                                    GTK_RESPONSE_OK)) {
+    gtk_button_set_label(GTK_BUTTON(ok), "_Promote");
+  }
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CANCEL);
+  g_signal_connect(
+      dialog, "response",
+      G_CALLBACK(+[](GtkDialog* dialog, gint response, gpointer) {
+        if (response == GTK_RESPONSE_OK) {
+          promote_next_key();
+        }
+        gtk_window_destroy(GTK_WINDOW(dialog));
+      }),
+      nullptr);
+  gtk_window_present(GTK_WINDOW(dialog));
+}
+
+void show_discard_confirm() {
+  auto* dialog = gtk_message_dialog_new(
+      GTK_WINDOW(g_state.window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING,
+      GTK_BUTTONS_OK_CANCEL, "Discard the staged next key?");
+  gtk_message_dialog_format_secondary_text(
+      GTK_MESSAGE_DIALOG(dialog),
+      "The staged UPDATE_ED25519_NEXT_* entries are deleted. The active "
+      "signing key is untouched, and a snapshot keeps the staged material "
+      "recoverable.");
+  if (auto* ok = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog),
+                                                    GTK_RESPONSE_OK)) {
+    gtk_button_set_label(GTK_BUTTON(ok), "_Discard");
+  }
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CANCEL);
+  g_signal_connect(
+      dialog, "response",
+      G_CALLBACK(+[](GtkDialog* dialog, gint response, gpointer) {
+        if (response == GTK_RESPONSE_OK) {
+          discard_next_key();
+        }
+        gtk_window_destroy(GTK_WINDOW(dialog));
+      }),
+      nullptr);
+  gtk_window_present(GTK_WINDOW(dialog));
+}
+
+void show_stray_scan_dialog() {
+  auto* dialog = gtk_dialog_new_with_buttons(
+      "Stray keys in the scanned folder", GTK_WINDOW(g_state.window),
+      static_cast<GtkDialogFlags>(GTK_DIALOG_MODAL |
+                                  GTK_DIALOG_DESTROY_WITH_PARENT |
+                                  GTK_DIALOG_USE_HEADER_BAR),
+      "_Done", GTK_RESPONSE_CLOSE, nullptr);
+  gtk_window_set_default_size(GTK_WINDOW(dialog), 640, 420);
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CLOSE);
+
+  auto* content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+  gtk_box_set_spacing(GTK_BOX(content), 8);
+  gtk_widget_set_margin_top(content, 12);
+  gtk_widget_set_margin_bottom(content, 12);
+  gtk_widget_set_margin_start(content, 12);
+  gtk_widget_set_margin_end(content, 12);
+  auto* caption = make_label(
+      "Private keys found outside the vault — collect them (Import) and "
+      "delete the stray copies. Only paths, line numbers and fingerprints "
+      "are shown.",
+      "kw-dim");
+  gtk_label_set_wrap(GTK_LABEL(caption), TRUE);
+  gtk_box_append(GTK_BOX(content), caption);
+
+  auto* rows = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+  if (g_state.stray_rows.empty()) {
+    gtk_box_append(GTK_BOX(rows),
+                   make_label("No stray private keys found", "kw-dim"));
+  }
+  for (auto const& hit : g_state.stray_rows) {
+    auto* row = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    gtk_widget_add_css_class(row, "kw-card");
+    auto* path = gtk_label_new(hit.path.c_str());
+    gtk_widget_add_css_class(path, "kw-mono");
+    gtk_label_set_xalign(GTK_LABEL(path), 0.0f);
+    gtk_box_append(GTK_BOX(row), path);
+    auto const detail =
+        hit.line.empty() ? hit.kind : hit.kind + " — line " + hit.line;
+    auto* detail_label = make_label(detail.c_str(), "kw-caption");
+    gtk_widget_add_css_class(detail_label, "kw-dim");
+    gtk_label_set_xalign(GTK_LABEL(detail_label), 0.0f);
+    gtk_box_append(GTK_BOX(row), detail_label);
+    if (!hit.fingerprint.empty() && hit.fingerprint != "-") {
+      auto* fp = gtk_label_new(hit.fingerprint.c_str());
+      gtk_widget_add_css_class(fp, "kw-mono");
+      gtk_widget_add_css_class(fp, "kw-caption");
+      gtk_widget_add_css_class(fp, "kw-dim");
+      gtk_label_set_xalign(GTK_LABEL(fp), 0.0f);
+      gtk_box_append(GTK_BOX(row), fp);
+    }
+    gtk_box_append(GTK_BOX(rows), row);
+  }
+  auto* scroller = gtk_scrolled_window_new();
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroller), rows);
+  gtk_widget_set_vexpand(scroller, TRUE);
+  gtk_box_append(GTK_BOX(content), scroller);
+
+  g_signal_connect(
+      dialog, "response",
+      G_CALLBACK(+[](GtkDialog* dialog, gint, gpointer) {
+        gtk_window_destroy(GTK_WINDOW(dialog));
+      }),
+      nullptr);
+  gtk_window_present(GTK_WINDOW(dialog));
+}
+
+void stray_scan_dialog() {
+  auto* dialog = gtk_file_dialog_new();
+  gtk_file_dialog_set_title(dialog, "Scan Folder for Stray Keys");
+  gtk_file_dialog_select_folder(
+      dialog, GTK_WINDOW(g_state.window), nullptr,
+      +[](GObject* source, GAsyncResult* result, gpointer) {
+        GError* error = nullptr;
+        GFile* folder = gtk_file_dialog_select_folder_finish(
+            GTK_FILE_DIALOG(source), result, &error);
+        if (folder != nullptr) {
+          gchar* path = g_file_get_path(folder);
+          if (path != nullptr) {
+            run_stray_scan(path);
+            g_free(path);
+          }
+          g_object_unref(folder);
+        }
+        if (error != nullptr) g_error_free(error);
+        g_object_unref(GTK_FILE_DIALOG(source));
+      },
+      nullptr);
+}
+
 void on_snapshot_dialog_destroy(gpointer data) {
   delete static_cast<std::function<void()>*>(data);
   g_state.snapshot_refresher = nullptr;
@@ -1166,6 +1495,7 @@ void select_product(std::string const& name) {
                       g_state.entries.push_back(std::move(entry));
                     }
                     rebuild_detail();
+                    refresh_rotation();
                   });
       });
 }
@@ -1335,11 +1665,156 @@ void open_store(std::string const& path) {
           ++g_state.selection_generation;
           g_state.checks.clear();
           g_state.entries.clear();
+          g_state.rotation = {};
+          g_state.stray_rows.clear();
           rebuild_product_list();
           rebuild_detail();
           refresh_products(nullptr);
           set_status("Store switched: " + opened);
         });
+      });
+}
+
+// ---- rotation (the two-phase runbook) + stray scan + export ----------------
+
+void refresh_rotation() {
+  if (g_state.api == nullptr || g_state.selected.empty()) return;
+  (void)g_state.api->rotation_status_async(
+      g_state.selected,
+      [](rivet_app::Result<std::vector<std::string>> result) {
+        on_result(std::move(result),
+                  [](std::vector<std::string> const& row) {
+                    g_state.rotation.next_present =
+                        row.empty() ? "no" : row[0];
+                    g_state.rotation.next_paired =
+                        row.size() > 1 ? row[1] : "-";
+                    g_state.rotation.next_fingerprint =
+                        row.size() > 2 ? row[2] : "-";
+                    g_state.rotation.next_key_id =
+                        row.size() > 3 ? row[3] : "-";
+                    g_state.rotation.active_fingerprint =
+                        row.size() > 4 ? row[4] : "-";
+                    g_state.rotation.active_key_id =
+                        row.size() > 5 ? row[5] : "-";
+                    rebuild_detail();
+                  });
+      });
+}
+
+void stage_next_key() {
+  if (g_state.api == nullptr || g_state.selected.empty()) return;
+  (void)g_state.api->rotation_start_async(
+      g_state.selected,
+      [](rivet_app::Result<std::vector<std::string>> result) {
+        on_result(
+            std::move(result),
+            [](std::vector<std::string> const& row) {
+              auto const key_id = row.empty() ? "" : row[0];
+              auto const fingerprint = row.size() > 1 ? row[1] : "";
+              set_status("Staged next key " + key_id + " — fingerprint " +
+                         fingerprint +
+                         ". Embed its public anchors in app source and ship "
+                         "a phase-1 release before promoting.");
+              refresh_products([]() -> void {
+                if (!g_state.selected.empty()) {
+                  select_product(g_state.selected);
+                }
+              });
+            });
+      });
+}
+
+void promote_next_key() {
+  if (g_state.api == nullptr || g_state.selected.empty()) return;
+  (void)g_state.api->rotation_promote_async(
+      g_state.selected,
+      [](rivet_app::Result<std::vector<std::string>> result) {
+        on_result(
+            std::move(result),
+            [](std::vector<std::string> const& row) {
+              auto const key_id = row.empty() ? "" : row[0];
+              auto const fingerprint = row.size() > 1 ? row[1] : "";
+              set_status("Promoted " + key_id + " — fingerprint " +
+                         fingerprint +
+                         ". Now swap the CI secret to the new private key; "
+                         "releases sign with the new key from here.");
+              refresh_products([]() -> void {
+                if (!g_state.selected.empty()) {
+                  select_product(g_state.selected);
+                }
+              });
+            });
+      });
+}
+
+void discard_next_key() {
+  if (g_state.api == nullptr || g_state.selected.empty()) return;
+  (void)g_state.api->rotation_cancel_async(
+      g_state.selected,
+      [](rivet_app::Result<bool> result) {
+        on_result(std::move(result), [](bool) {
+          set_status("Discarded the staged next key (snapshot taken)");
+          refresh_products([]() -> void {
+            if (!g_state.selected.empty()) {
+              select_product(g_state.selected);
+            }
+          });
+        });
+      });
+}
+
+void run_stray_scan(std::string const& path) {
+  if (g_state.api == nullptr) return;
+  (void)g_state.api->stray_scan_tree_async(
+      path,
+      [](rivet_app::Result<std::vector<std::vector<std::string>>> result) {
+        on_result(
+            std::move(result),
+            [](std::vector<std::vector<std::string>> const& rows) {
+              g_state.stray_rows.clear();
+              for (auto const& row : rows) {
+                StrayRow hit;
+                if (!row.empty()) hit.path = row[0];
+                if (row.size() > 1) hit.line = row[1];
+                if (row.size() > 2) hit.kind = row[2];
+                if (row.size() > 3) hit.fingerprint = row[3];
+                g_state.stray_rows.push_back(std::move(hit));
+              }
+              set_status("Stray-key scan finished — " +
+                         std::to_string(g_state.stray_rows.size()) +
+                         " hits");
+              show_stray_scan_dialog();
+            });
+      });
+}
+
+void copy_export(std::string const& name, std::string const& format) {
+  if (g_state.api == nullptr || g_state.selected.empty()) return;
+  auto const product = g_state.selected;
+  auto const generation = g_state.selection_generation;
+  (void)g_state.api->keypair_export_async(
+      product, name, format,
+      [name, product, generation, format](
+          rivet_app::Result<std::string> result) {
+        on_result(
+            std::move(result),
+            [name, product, generation, format](std::string const& value) {
+              if (product != g_state.selected ||
+                  generation != g_state.selection_generation) {
+                set_status("Copy skipped — selection changed");
+                return;
+              }
+              if (clipboard_copy_owned(value)) {
+                schedule_clipboard_expiry();
+                set_status("Copied " + name + " as " + format +
+                           " — raw value on the clipboard, other apps can "
+                           "read it; auto-clears in 30 s unless something "
+                           "else copies first");
+              } else {
+                set_status("Copy failed — the clipboard rejected the "
+                           "content");
+              }
+            });
       });
 }
 
@@ -1401,6 +1876,29 @@ void on_action_delete_entry(GSimpleAction*, GVariant* parameter, gpointer) {
     show_delete_confirm(g_variant_get_string(parameter, nullptr));
   }
 }
+void on_action_stage_key(GSimpleAction*, GVariant*, gpointer) {
+  show_stage_confirm();
+}
+void on_action_promote_key(GSimpleAction*, GVariant*, gpointer) {
+  show_promote_confirm();
+}
+void on_action_discard_key(GSimpleAction*, GVariant*, gpointer) {
+  show_discard_confirm();
+}
+void on_action_scan_stray(GSimpleAction*, GVariant*, gpointer) {
+  stray_scan_dialog();
+}
+void on_action_copy_export(GSimpleAction*, GVariant* parameter, gpointer) {
+  if (parameter != nullptr) {
+    // "name|format" — entry names are UPPER_SNAKE and formats contain no
+    // pipe, so the last '|' is always the separator.
+    std::string const packed = g_variant_get_string(parameter, nullptr);
+    auto const sep = packed.rfind('|');
+    if (sep != std::string::npos) {
+      copy_export(packed.substr(0, sep), packed.substr(sep + 1));
+    }
+  }
+}
 
 void install_actions_and_menu(GtkApplication* app,
                               GtkApplicationWindow* window) {
@@ -1419,6 +1917,13 @@ void install_actions_and_menu(GtkApplication* app,
   add_window_action(window, "import-entry", on_action_import_entry,
                     G_VARIANT_TYPE_STRING);
   add_window_action(window, "delete-entry", on_action_delete_entry,
+                    G_VARIANT_TYPE_STRING);
+  add_window_action(window, "stage-key", on_action_stage_key);
+  add_window_action(window, "promote-key", on_action_promote_key);
+  add_window_action(window, "discard-key", on_action_discard_key);
+  g_state.scan_stray_action = add_tracked_window_action(
+      window, "scan-stray", on_action_scan_stray);
+  add_window_action(window, "copy-export", on_action_copy_export,
                     G_VARIANT_TYPE_STRING);
 
   // Accelerators mirror the macOS host: ⌘O choose vault, ⌘R deep check,
@@ -1440,6 +1945,7 @@ GMenu* build_header_menu() {
   auto* vault_section = g_menu_new();
   g_menu_append(vault_section, "Deep Check", "win.deep-check");
   g_menu_append(vault_section, "Snapshots", "win.snapshots");
+  g_menu_append(vault_section, "Scan Folder for Stray Keys…", "win.scan-stray");
   g_menu_append_section(menu, nullptr, G_MENU_MODEL(vault_section));
   g_object_unref(vault_section);
   auto* help_section = g_menu_new();
