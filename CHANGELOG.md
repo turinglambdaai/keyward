@@ -3,7 +3,11 @@
 All notable changes to Keyward are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is SemVer.
 
-## [Unreleased]
+## 0.3.0 - 2026-10-30
+
+**Upgrading from 0.2.1:** no manual steps — your vault, config and
+snapshots work as-is. The rotation entries (`UPDATE_ED25519_NEXT_*`)
+appear in a section only after you stage a next key.
 
 ### Added
 

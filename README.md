@@ -65,19 +65,18 @@ Free release-infrastructure tool under AGPL-3.0; no commercial activation. Deskt
 
 ## Status
 
-**v0.2.1 is out** — installers for all three desktops on the
+**v0.3.0 is out** — installers for all three desktops on the
 [Releases page](https://github.com/turlamai/keyward/releases/latest):
 macOS (arm64 / x64, DMG + zip), Windows (x64, MSI + zip) and Linux (x64 /
 arm64, deb + rpm + AppImage + tar.gz + zip), each with a SHA-256 sidecar.
-The Windows (WinUI 3) and Linux (GTK4) hosts are built and CI-covered.
-0.2.1 fixes the v0.2.0 restart wedge (a chosen vault no longer bricks the
-next launch) and brings the three hosts to one interaction contract:
-identical status refreshes, dialog defaults and clipboard disclosure.
-
-On main, heading for the next release: the two-phase rotation workflow
-(stage → promote with a pairing-gated Promote), the stray-key scanner for
-working trees, and Sparkle/Tauri key format import and export — plus a fix
-that makes choosing a vault switch immediately instead of after a relaunch.
+The Windows (WinUI 3) and Linux (GTK4) hosts are built and CI-covered,
+and the three hosts share one interaction contract: identical status
+refreshes, dialog defaults and clipboard disclosure. 0.3.0 adds the
+two-phase rotation workflow (stage a next key without touching the
+active signing key, ship a release that trusts it, then promote —
+pairing-gated), a stray-key scanner for working trees, and
+Sparkle/Tauri key format import and export; choosing a vault now
+switches immediately instead of after a relaunch.
 
 ## Security model
 
