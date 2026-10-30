@@ -156,9 +156,112 @@
             "kind": "scalar",
             "name": "String"
           }
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "format",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "keypair-export",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
         }
       ],
       "name": "keypair-generate",
+      "result": {
+        "element": {
+          "kind": "scalar",
+          "name": "String"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "rotation-cancel",
+      "result": {
+        "kind": "scalar",
+        "name": "Bool"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "rotation-promote",
+      "result": {
+        "element": {
+          "kind": "scalar",
+          "name": "String"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "rotation-start",
+      "result": {
+        "element": {
+          "kind": "scalar",
+          "name": "String"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "product",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "rotation-status",
       "result": {
         "element": {
           "kind": "scalar",
@@ -233,6 +336,28 @@
       "result": {
         "kind": "scalar",
         "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "dir",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "stray-scan-tree",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
       }
     }
   ],

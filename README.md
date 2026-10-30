@@ -44,6 +44,14 @@ your own synced folder and adds the discipline a plaintext store lacks:
   files, even momentarily.
 - **Orphan detection.** Multi-line residue from a bad paste shows up as line
   numbers the moment the vault is opened.
+- **Rotation as a workflow.** Stage a next key under `UPDATE_ED25519_NEXT_*`
+  without touching the active signing key, ship a release that trusts it,
+  then Promote — the two-phase runbook, mechanized.
+- **Stray sweep.** Scan a working tree for private-key material that never
+  made it into the vault; hits report path, line and fingerprint, never values.
+- **Speaks your updater's dialect.** Import Sparkle/minisign key files as-is
+  and copy vault entries back out as Sparkle, Tauri/minisign or PEM —
+  clipboard-only.
 
 The vault format is plain INI (`[product]` sections, `NAME = value`,
 comments preserved) and stays the single source of truth — Keyward is a
@@ -65,9 +73,11 @@ The Windows (WinUI 3) and Linux (GTK4) hosts are built and CI-covered.
 0.2.1 fixes the v0.2.0 restart wedge (a chosen vault no longer bricks the
 next launch) and brings the three hosts to one interaction contract:
 identical status refreshes, dialog defaults and clipboard disclosure.
-Roadmap: rotation workflow (generate-next → promote, following the
-two-phase runbook), stray-key scanner for working trees, Sparkle/Tauri key
-format import and export.
+
+On main, heading for the next release: the two-phase rotation workflow
+(stage → promote with a pairing-gated Promote), the stray-key scanner for
+working trees, and Sparkle/Tauri key format import and export — plus a fix
+that makes choosing a vault switch immediately instead of after a relaunch.
 
 ## Security model
 

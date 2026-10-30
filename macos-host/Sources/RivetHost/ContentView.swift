@@ -22,10 +22,19 @@ struct ContentView: View {
         .sheet(isPresented: $model.snapshotsVisible) {
             SnapshotsSheet()
         }
+        .sheet(isPresented: $model.strayScanVisible) {
+            StrayScanSheet()
+        }
         .fileImporter(isPresented: $model.openStoreRequested,
                       allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first {
                 model.openStore(at: url)
+            }
+        }
+        .fileImporter(isPresented: $model.strayScanRequested,
+                      allowedContentTypes: [.folder], allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                model.runStrayScan(at: url)
             }
         }
         .alert("Engine message", isPresented: Binding(
@@ -222,8 +231,19 @@ private func entryPurpose(_ name: String) -> String {
         return "Pasted into the macOS Swift host UpdateService (raw 32-byte form)"
     case "RIVET_UPDATE_KEY_ID":
         return "Written into the signed update manifest"
+    case "UPDATE_ED25519_NEXT_PRIVATE_KEY_B64":
+        return "Staged next key — swap it into CI after the phase-1 release ships (Promote)"
+    case "UPDATE_ED25519_NEXT_PUBLIC_KEY_SPKI_B64":
+        return "Staged next anchor — embed in app source during rotation phase 1"
+    case "UPDATE_ED25519_NEXT_PUBLIC_KEY_RAW_TAIL32_B64":
+        return "Staged next anchor (raw 32B) — macOS host UpdateService in phase 1"
+    case "UPDATE_ED25519_NEXT_KEY_ID":
+        return "Key id the staged key takes over at Promote"
     default:
         if name.hasSuffix("_FPR") { return "Pairing anchor for Deep Check" }
+        if name.hasPrefix("UPDATE_ED25519_NEXT_") {
+            return "Staged rotation key — phase-1 material; Promote moves it to the active names"
+        }
         if name.hasPrefix("LICENSE_") || name.hasPrefix("PERMIT_") {
             return "Commercial signing — different lifecycle from update keys"
         }
@@ -298,6 +318,9 @@ private struct ProductDetail: View {
     @State private var importTarget: EntryRow?
     @State private var showingImporter = false
     @State private var confirmingKeyGen = false
+    @State private var confirmingStage = false
+    @State private var confirmingPromote = false
+    @State private var confirmingDiscard = false
     @State private var deleteTarget: EntryRow?
 
     private var check: CheckRow? {
@@ -308,6 +331,7 @@ private struct ProductDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
+                rotationSection
                 entriesSection
             }
             .padding(20)
@@ -341,6 +365,31 @@ private struct ProductDetail: View {
                 .keyboardShortcut(.defaultAction)
         } message: {
             Text(keyGenMessage)
+        }
+        .confirmationDialog(stageTitle, isPresented: $confirmingStage,
+                            titleVisibility: .visible) {
+            Button("Stage", role: .destructive) { model.stageNextKey() }
+            Button("Cancel", role: .cancel) {}
+                .keyboardShortcut(.defaultAction)
+        } message: {
+            Text(stageMessage)
+        }
+        .confirmationDialog(promoteTitle, isPresented: $confirmingPromote,
+                            titleVisibility: .visible) {
+            Button("Promote", role: .destructive) { model.promoteNextKey() }
+            Button("Cancel", role: .cancel) {}
+                .keyboardShortcut(.defaultAction)
+        } message: {
+            Text(promoteMessage)
+        }
+        .confirmationDialog("Discard the staged next key?", isPresented: $confirmingDiscard,
+                            titleVisibility: .visible) {
+            Button("Discard", role: .destructive) { model.discardNextKey() }
+            Button("Cancel", role: .cancel) {}
+                .keyboardShortcut(.defaultAction)
+        } message: {
+            Text("The staged UPDATE_ED25519_NEXT_* entries are deleted. The active signing "
+                 + "key is untouched, and a snapshot keeps the staged material recoverable.")
         }
         .confirmationDialog(deleteTitle, isPresented: deleteBinding,
                             titleVisibility: .visible) {
@@ -420,6 +469,80 @@ private struct ProductDetail: View {
                 .strokeBorder(model.theme.divider, lineWidth: 1))
     }
 
+    // ---- rotation (the two-phase runbook) ---------------------------------------------
+
+    private var staged: Bool { model.rotation.nextPresent == "yes" }
+
+    private var rotationSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Rotation")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(model.theme.secondaryText)
+                Spacer()
+                if staged {
+                    Button("Discard Staged Key…") { confirmingDiscard = true }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(model.theme.secondaryText)
+                        .disabled(!model.ready)
+                    Button("Promote…") { confirmingPromote = true }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(model.theme.warn)
+                        .disabled(!model.ready || model.rotation.nextPaired != "ok")
+                        .help(model.rotation.nextPaired == "ok"
+                              ? "Phase 2: make the staged key the signing key"
+                              : "The staged pair must pass pairing (Deep Check) before promote")
+                } else {
+                    Button("Stage Next Key…") { confirmingStage = true }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(model.theme.accent)
+                        .disabled(!model.ready)
+                        .help("Phase 1: stage a new pair without touching the active signing key")
+                }
+            }
+            if staged {
+                HStack(spacing: 8) {
+                    KVChip(label: "next key id", value: model.rotation.nextKeyID, theme: model.theme)
+                    KVChip(label: "next fingerprint", value: model.rotation.nextFingerprint,
+                           mono: true, theme: model.theme)
+                    KVChip(label: "paired", value: model.rotation.nextPaired,
+                           tone: model.rotation.nextPaired == "ok" ? .ok : .warn, theme: model.theme)
+                    Spacer()
+                }
+                Text("Phase 1 in progress: copy the staged public anchors below (Export menu) into "
+                     + "app source, ship a release signed with the old key, then Promote and swap the CI secret.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(model.theme.secondaryText)
+            } else {
+                Text("No key staged. Staging generates a next pair under UPDATE_ED25519_NEXT_* "
+                     + "while the active signing key keeps releasing untouched.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(model.theme.tertiaryText)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(model.theme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(model.theme.divider, lineWidth: 1))
+    }
+
+    private var stageTitle: String { "Stage a next update key for \(product.name)?" }
+    private var stageMessage: String {
+        "A new Ed25519 pair is written under UPDATE_ED25519_NEXT_* entries; any currently staged "
+            + "pair is replaced. The active signing key is untouched."
+    }
+    private var promoteTitle: String { "Promote the staged key to the active signing key?" }
+    private var promoteMessage: String {
+        "The UPDATE_ED25519_* entries take over the staged values and the NEXT entries are removed. "
+            + "Afterwards every release signs with the new key — swap the GitHub CI secret first, "
+            + "and only promote once the phase-1 release (embedding the new public anchors) has shipped."
+    }
+
     private var entriesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -442,6 +565,7 @@ private struct ProductDetail: View {
                               importTarget = entry
                               showingImporter = true
                           },
+                          onExport: { model.copyExport(entry: entry, format: $0) },
                           onDelete: { deleteTarget = entry })
             }
         }
@@ -539,11 +663,32 @@ private struct StatusChip: View {
     }
 }
 
+/// Updater-native export formats, by entry role: private keys can leave as
+/// Sparkle's base64(seed+pub), PKCS#8 PEM or an unencrypted minisign secret;
+/// public anchors as Sparkle's SUPublicEDKey, minisign .pub (plus the
+/// base64 tauri.conf.json form) or SPKI PEM. Values go to the clipboard
+/// with the same disclosure as a plain copy — never to a file.
+private func exportFormats(for name: String) -> [(String, String)] {
+    if name.contains("PRIVATE") {
+        return [("sparkle-private", "Sparkle private key (sign_update)"),
+                ("pem-private", "PKCS#8 PEM"),
+                ("tauri-key", "Tauri / minisign secret key (unencrypted)")]
+    }
+    if name.contains("PUBLIC") {
+        return [("sparkle-public", "Sparkle SUPublicEDKey"),
+                ("tauri-pub", "Tauri / minisign .pub file"),
+                ("tauri-pub-b64", "Tauri pubkey for tauri.conf.json (base64)"),
+                ("pem-public", "SPKI PEM")]
+    }
+    return []
+}
+
 private struct EntryCard: View {
     @EnvironmentObject private var model: KeywardModel
     let entry: EntryRow
     let onCopy: () -> Void
     let onImport: () -> Void
+    let onExport: (String) -> Void
     let onDelete: () -> Void
 
     @State private var isHovering = false
@@ -584,7 +729,14 @@ private struct EntryCard: View {
             }
             Menu {
                 Button("Copy value to clipboard") { onCopy() }
-                Button("Import PEM file…") { onImport() }
+                if !exportFormats(for: entry.name).isEmpty {
+                    Menu("Copy as…") {
+                        ForEach(exportFormats(for: entry.name), id: \.1) { item in
+                            Button(item.1) { onExport(item.0) }
+                        }
+                    }
+                }
+                Button("Import key file…") { onImport() }
                 Button("Delete…", role: .destructive) { onDelete() }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -632,6 +784,87 @@ private struct StatusBar: View {
         .padding(.horizontal, 12)
         .frame(height: Palette.statusHeight)
         .background(model.theme.sidebar)
+    }
+}
+
+// ---- stray-key scan sheet ---------------------------------------------------------
+
+/// Results of a working-tree scan: path/line/kind/fingerprint rows, values
+/// never. A scan of the vault's own synced folder finds nothing — the
+/// engine excludes the vault and its .history by design.
+private struct StrayScanSheet: View {
+    @EnvironmentObject private var model: KeywardModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Stray keys in the scanned folder")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(model.theme.onSurface)
+                    Text("Private keys found outside the vault — collect them (Import) and delete\n"
+                         + "the stray copies. Only paths, line numbers and fingerprints are shown.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(model.theme.secondaryText)
+                }
+                Spacer()
+                Button("Done") { model.strayScanVisible = false }
+            }
+            .padding(16)
+            Divider().overlay(model.theme.divider)
+            if model.strayRows.isEmpty {
+                Text("No stray private keys found")
+                    .font(.system(size: 13))
+                    .foregroundStyle(model.theme.secondaryText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 6) {
+                        ForEach(model.strayRows) { row in
+                            StrayRowView(row: row)
+                        }
+                    }
+                    .padding(12)
+                }
+            }
+        }
+        .frame(width: 640, height: 440)
+        .background(model.theme.background)
+    }
+}
+
+private struct StrayRowView: View {
+    @EnvironmentObject private var model: KeywardModel
+    let row: StrayRow
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: row.kind.hasPrefix("pem") || row.kind.hasPrefix("der")
+                  || row.kind.hasPrefix("sparkle") ? "exclamationmark.triangle.fill" : "doc.text.magnifyingglass")
+                .font(.system(size: 12))
+                .foregroundStyle(model.theme.warn)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(row.path)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(model.theme.onSurface)
+                    .lineLimit(1)
+                Text(row.line.isEmpty ? row.kind : "\(row.kind) — line \(row.line)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(model.theme.tertiaryText)
+            }
+            Spacer()
+            if row.fingerprint != "" && row.fingerprint != "-" {
+                Text(row.fingerprint)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(model.theme.secondaryText)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(model.theme.surface, in: RoundedRectangle(cornerRadius: Palette.cardRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: Palette.cardRadius)
+                .strokeBorder(model.theme.divider, lineWidth: 1))
     }
 }
 

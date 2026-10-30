@@ -41,6 +41,11 @@
                         <KeyboardAccelerator Modifiers="Control" Key="L" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    x:Name="ScanStrayItem"
+                    Text="Scan Folder for Stray Keys…"
+                    Click="OnScanStrayKeys"
+                    IsEnabled="False" />
             </MenuBarItem>
             <MenuBarItem Title="Help">
                 <MenuFlyoutItem Text="About Keyward" Click="OnAbout" />
