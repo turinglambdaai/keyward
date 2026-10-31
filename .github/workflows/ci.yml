@@ -5,9 +5,14 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Preserve main quality gates; only cancel superseded checks for the same PR.
+  # A unique run ID prevents newer main pushes from cancelling earlier runs.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Pinned so CI validates the same rivet the release workflow ships with.
 env:
